@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Nika &amp; Olivia ❤️</title>
+<title>Contraction Timer</title>
 <style>
   :root {
     --bg: #14110f;
@@ -20,7 +20,6 @@
     --soon-bg: #33270f; --soon-border: #6b5217; --soon-text: #f0c060;
     --ok: #6f9a6f;
     --warn: #b08a4f;
-    --heart: #e0796b;
   }
   html[data-theme="light"] {
     --bg: #f7f1ea;
@@ -37,7 +36,6 @@
     --soon-bg: #faf0d8; --soon-border: #e6cf96; --soon-text: #8a6d1f;
     --ok: #4c7d4c;
     --warn: #9a7433;
-    --heart: #c2503a;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
   body {
@@ -51,8 +49,7 @@
     transition: background 0.25s, color 0.25s;
   }
   .top { display: flex; align-items: flex-start; justify-content: space-between; }
-  h1 { font-size: 20px; font-weight: 600; margin-bottom: 2px; letter-spacing: -0.01em; }
-  .dedication { color: var(--heart); font-size: 13px; margin-bottom: 2px; }
+  h1 { font-size: 20px; font-weight: 600; margin-bottom: 4px; letter-spacing: -0.01em; }
   .sub { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
   .themebtn {
     background: var(--card);
@@ -152,6 +149,38 @@
   }
   .rowbtn:active { color: var(--text); }
   .empty { color: var(--subtle); font-size: 14px; padding: 8px 4px; }
+
+  .overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.55);
+    display: none;
+    align-items: center; justify-content: center;
+    z-index: 10; padding: 16px;
+  }
+  .overlay.open { display: flex; }
+  .modal {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px;
+    width: 100%; max-width: 320px;
+  }
+  .modal h3 { font-size: 15px; font-weight: 600; margin-bottom: 14px; }
+  .field { margin-bottom: 12px; }
+  .field label { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 5px; }
+  .field input {
+    width: 100%; padding: 10px; font-size: 16px;
+    border-radius: 10px; border: 1px solid var(--border);
+    background: var(--bg); color: var(--text);
+  }
+  .modal .err { color: var(--go-text); font-size: 12px; margin-top: 2px; display: none; }
+  .modal .btns { display: flex; gap: 10px; margin-top: 16px; }
+  .modal .btns button {
+    flex: 1; padding: 12px; font-size: 14px;
+    border-radius: 10px; border: 1px solid var(--border);
+    background: var(--card); color: var(--soft); cursor: pointer;
+  }
+  .modal .btns button.primary { background: var(--btn-start); border-color: transparent; color: #fff; font-weight: 600; }
   .saved-note { font-size: 11px; color: var(--subtle); text-align: center; margin-top: 18px; }
   .saved-note.ok { color: var(--ok); }
   .saved-note.warn { color: var(--warn); }
@@ -160,10 +189,7 @@
 </head>
 <body>
   <div class="top">
-    <div>
-      <h1>Contraction Timer</h1>
-      <div class="dedication">For Nika, while we wait for little Olivia ❤️</div>
-    </div>
+    <h1>Contraction Timer</h1>
     <button class="themebtn" id="themeBtn" aria-label="Toggle light/dark">☀️</button>
   </div>
   <div class="sub">Tap start when one begins, stop when it ends.</div>
@@ -199,10 +225,29 @@
 
   <h2>Log</h2>
   <ul class="log" id="logList">
-    <li class="empty">No contractions yet — Olivia is taking her time 💛</li>
+    <li class="empty">No contractions yet.</li>
   </ul>
 
   <div class="saved-note" id="syncNote">Saved automatically to this device.</div>
+
+  <div class="overlay" id="editOverlay">
+    <div class="modal">
+      <h3>Edit contraction</h3>
+      <div class="field">
+        <label for="editTime">Start time</label>
+        <input type="time" id="editTime" step="60">
+      </div>
+      <div class="field">
+        <label for="editDur">Duration (m:ss or seconds)</label>
+        <input type="text" id="editDur" inputmode="numeric" placeholder="1:05">
+      </div>
+      <div class="err" id="editErr"></div>
+      <div class="btns">
+        <button id="editCancel">Cancel</button>
+        <button class="primary" id="editSave">Save</button>
+      </div>
+    </div>
+  </div>
 
 <script>
   const STORAGE_KEY = 'contractionLog_v2';
@@ -343,23 +388,46 @@
     return new Date(ts).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
   }
 
-  // ---- edit / delete rows ----
+  // ---- edit (modal) / delete rows ----
+  const editOverlay = document.getElementById('editOverlay');
+  const editTime = document.getElementById('editTime');
+  const editDur = document.getElementById('editDur');
+  const editErr = document.getElementById('editErr');
+  let editIdx = null;
+
   function editRow(i) {
     const c = contractions[i];
     if (!c) return;
+    editIdx = i;
     const d = new Date(c.start);
-    const timeStr = prompt('Start time (HH:MM)', `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`);
-    if (timeStr === null) return;
-    const tm = timeStr.trim().match(/^(\d{1,2})[:.](\d{2})$/);
-    if (!tm || +tm[1] > 23 || +tm[2] > 59) { alert('Time must be HH:MM, e.g. 14:35'); return; }
-    const durStr = prompt('Duration (m:ss or seconds)', fmtDur(c.duration));
-    if (durStr === null) return;
+    editTime.value = `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
+    editDur.value = fmtDur(c.duration);
+    editErr.style.display = 'none';
+    editOverlay.classList.add('open');
+  }
+  function closeEdit() {
+    editOverlay.classList.remove('open');
+    editIdx = null;
+  }
+  function showEditErr(msg) {
+    editErr.textContent = msg;
+    editErr.style.display = 'block';
+  }
+  document.getElementById('editCancel').addEventListener('click', closeEdit);
+  editOverlay.addEventListener('click', (e) => { if (e.target === editOverlay) closeEdit(); });
+  document.getElementById('editSave').addEventListener('click', () => {
+    const c = contractions[editIdx];
+    if (!c) { closeEdit(); return; }
+    const tm = editTime.value.trim().match(/^(\d{1,2})[:.](\d{2})$/);
+    if (!tm || +tm[1] > 23 || +tm[2] > 59) { showEditErr('Start time must be HH:MM, e.g. 14:35'); return; }
     let durMs;
-    const dm = durStr.trim().match(/^(\d+)[:.](\d{1,2})$/);
+    const durStr = editDur.value.trim();
+    const dm = durStr.match(/^(\d+)[:.](\d{1,2})$/);
     if (dm) durMs = (+dm[1] * 60 + +dm[2]) * 1000;
-    else if (/^\d+s?$/.test(durStr.trim())) durMs = parseInt(durStr, 10) * 1000;
-    else { alert('Duration must be m:ss or seconds, e.g. 1:05 or 45'); return; }
-    if (durMs <= 0 || durMs > 30*60000) { alert('Duration must be between 1s and 30 min'); return; }
+    else if (/^\d+s?$/.test(durStr)) durMs = parseInt(durStr, 10) * 1000;
+    else { showEditErr('Duration must be m:ss or seconds, e.g. 1:05 or 45'); return; }
+    if (durMs <= 0 || durMs > 30*60000) { showEditErr('Duration must be between 1s and 30 min'); return; }
+    const d = new Date(c.start);
     d.setHours(+tm[1], +tm[2], d.getSeconds(), 0);
     c.start = d.getTime();
     c.duration = durMs;
@@ -367,7 +435,8 @@
     contractions.sort((a,b) => a.start - b.start);
     touch();
     render();
-  }
+    closeEdit();
+  });
   function deleteRow(i) {
     const c = contractions[i];
     if (!c) return;
@@ -406,7 +475,7 @@
     }
 
     if (n === 0) {
-      logList.innerHTML = '<li class="empty">No contractions yet — Olivia is taking her time 💛</li>';
+      logList.innerHTML = '<li class="empty">No contractions yet.</li>';
       return;
     }
     logList.innerHTML = '';
@@ -440,12 +509,12 @@
     statusEl.className = 'status';
     if (mins <= 5 && avgD >= 0.9) {
       statusEl.className = 'status go';
-      statusEl.textContent = '5-1-1 reached — Olivia is coming! Call fødetelefon 51 80 42 01';
+      statusEl.textContent = '5-1-1 reached — call fødetelefon 51 80 42 01';
     } else if (mins <= 8) {
       statusEl.className = 'status soon';
       statusEl.textContent = 'Getting closer — keep tracking, prep to go';
     } else {
-      statusEl.textContent = 'Early labour — rest, hydrate, conserve energy 💛';
+      statusEl.textContent = 'Early labour — rest, hydrate, conserve energy';
     }
   }
 
