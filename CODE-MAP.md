@@ -9,6 +9,9 @@ Two-file app: static page on GitHub Pages + Cloudflare Worker for cross-device s
   - `updateMainUI` — single place button/timer reflect `active`; called for both local taps and remote adoption. `tick` interval guard lives here.
   - Sync room comes from `#r=<id>` URL fragment (kept out of this public repo on purpose), then persisted in `localStorage[ROOM_KEY]`. No fragment ever seen → local-only mode.
   - `localStorage` v2 schema `{revision, contractions, active}`; one-shot migration from v1 in `load()`.
+  - Theme: `data-theme` on `<html>`, CSS vars per theme, per-device pref in `localStorage['ctTheme']` (NOT synced). Inline head script applies it pre-paint.
+  - `editRow`/`deleteRow` — per-row ✎/✕ via event delegation on `#logList` (`data-edit`/`data-del`); edit re-sorts by `start`, both call `touch()` to sync.
+  - Deploy habit: snapshot live KV state to `backups/` (gitignored — room id is the credential) BEFORE pushing app changes.
 - **`worker/index.js`** — Cloudflare Worker `contraction-sync` (account davidsen908, KV binding `STATE`). GET/PUT `/state/:room`, CORS `*`, validates JSON + numeric `revision`. Deploy: `npx wrangler deploy` (needs `wrangler login`).
 
 Gotchas:
