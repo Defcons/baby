@@ -1,0 +1,7 @@
+name = "contraction-sync"
+main = "worker/index.js"
+compatibility_date = "2026-07-16"
+
+[[kv_namespaces]]
+binding = "STATE"
+id = "2b5c1bca217e4ccd91ca00e1b88d4044"

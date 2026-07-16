@@ -96,6 +96,8 @@
   .log li .gap { font-variant-numeric: tabular-nums; color: #8a827a; font-size: 12px; min-width: 62px; text-align: right; }
   .empty { color: #6b635b; font-size: 14px; padding: 8px 4px; }
   .saved-note { font-size: 11px; color: #6b635b; text-align: center; margin-top: 18px; }
+  .saved-note.ok { color: #6f9a6f; }
+  .saved-note.warn { color: #b08a4f; }
 </style>
 </head>
 <body>
@@ -136,31 +138,110 @@
     <li class="empty">No contractions yet.</li>
   </ul>
 
-  <div class="saved-note">Saved automatically to this device. Safe to close and reopen.</div>
+  <div class="saved-note" id="syncNote">Saved automatically to this device.</div>
 
 <script>
-  const STORAGE_KEY = 'contractionLog_v1';
+  const STORAGE_KEY = 'contractionLog_v2';
+  const ROOM_KEY = 'syncRoom_v1';
+  const SYNC_URL = 'https://contraction-sync.davidsen908.workers.dev';
+  const POLL_MS = 4000;
+
   let contractions = [];
   let active = null;
   let tick = null;
+  let revision = 0;          // wall-clock ms of the last local mutation; higher revision wins
+  let syncOk = null;         // null = unknown, true = synced, false = offline/error
+
+  // ---- sync room: taken from #r=... in the shared link, then remembered per device ----
+  const hashRoom = (location.hash.match(/r=([a-z0-9-]{8,64})/i) || [])[1];
+  if (hashRoom) { try { localStorage.setItem(ROOM_KEY, hashRoom.toLowerCase()); } catch(e) {} }
+  const room = hashRoom ? hashRoom.toLowerCase() : (localStorage.getItem(ROOM_KEY) || null);
 
   // ---- persistence ----
   function save() {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ contractions, active }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ revision, contractions, active }));
     } catch(e) { /* private mode / full storage - ignore */ }
   }
   function load() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return;
-      const data = JSON.parse(raw);
-      contractions = data.contractions || [];
-      // if a contraction was mid-run when closed, resume it
-      if (data.active && data.active.start) {
-        active = data.active;
+      if (raw) {
+        const data = JSON.parse(raw);
+        revision = data.revision || 0;
+        contractions = data.contractions || [];
+        if (data.active && data.active.start) active = data.active;
+        return;
+      }
+      // migrate v1 data (pre-sync version) if present
+      const old = localStorage.getItem('contractionLog_v1');
+      if (old) {
+        const data = JSON.parse(old);
+        contractions = data.contractions || [];
+        if (data.active && data.active.start) active = data.active;
+        if (contractions.length || active) revision = Date.now();
+        save();
       }
     } catch(e) { contractions = []; }
+  }
+
+  // ---- cross-device sync (last write wins by revision) ----
+  function setSyncNote(state) {
+    const el = document.getElementById('syncNote');
+    if (!room) {
+      el.className = 'saved-note';
+      el.textContent = 'Saved to this device only — open the shared sync link to share the log.';
+    } else if (state === true) {
+      el.className = 'saved-note ok';
+      el.textContent = 'Synced across devices ✓';
+    } else if (state === false) {
+      el.className = 'saved-note warn';
+      el.textContent = 'Offline — saved on this device, will sync when connection returns.';
+    } else {
+      el.className = 'saved-note';
+      el.textContent = 'Connecting to sync…';
+    }
+  }
+
+  function pushState() {
+    if (!room) return;
+    fetch(`${SYNC_URL}/state/${room}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ revision, contractions, active }),
+    })
+      .then(r => { syncOk = r.ok; setSyncNote(syncOk); })
+      .catch(() => { syncOk = false; setSyncNote(false); });
+  }
+
+  function applyRemote(remote) {
+    revision = remote.revision;
+    contractions = remote.contractions || [];
+    active = (remote.active && remote.active.start) ? remote.active : null;
+    save();
+    updateMainUI();
+    render();
+  }
+
+  async function pull() {
+    if (!room) return;
+    try {
+      const res = await fetch(`${SYNC_URL}/state/${room}`, { cache: 'no-store' });
+      if (!res.ok) throw 0;
+      const remote = await res.json();
+      syncOk = true; setSyncNote(true);
+      if (remote && remote.revision > revision) applyRemote(remote);
+      else if (!remote || remote.revision < revision) pushState(); // we're ahead (e.g. logged while offline)
+    } catch(e) {
+      syncOk = false; setSyncNote(false);
+    }
+  }
+
+  // called after every local mutation
+  function touch() {
+    revision = Date.now();
+    save();
+    pushState();
   }
 
   const mainBtn = document.getElementById('mainBtn');
@@ -201,12 +282,16 @@
     } else {
       document.getElementById('avgFreq').textContent = '—';
       document.getElementById('lastGap').textContent = '—';
+      statusEl.className = 'status';
+      statusEl.textContent = n === 1 ? 'First contraction logged — keep tracking' : 'Waiting for first contraction';
     }
 
     if (n >= 1) {
       const last5 = contractions.slice(-5);
       const avgD = last5.reduce((a,b)=>a+b.duration,0)/last5.length;
       document.getElementById('avgDur').textContent = fmtDur(avgD);
+    } else {
+      document.getElementById('avgDur').textContent = '—';
     }
 
     if (n === 0) {
@@ -248,66 +333,68 @@
     }, 250);
   }
 
-  mainBtn.addEventListener('click', () => {
-    if (!active) {
-      active = { start: Date.now() };
+  // single place that makes the button/timer reflect `active` (local taps AND remote sync)
+  function updateMainUI() {
+    if (active) {
       mainBtn.textContent = 'Stop contraction';
       mainBtn.className = 'bigbtn stop';
       runningTimer.classList.remove('hidden');
-      startTick();
-      save();
+      if (!tick) startTick();
     } else {
-      clearInterval(tick);
-      active.end = Date.now();
-      active.duration = active.end - active.start;
-      contractions.push(active);
-      active = null;
+      if (tick) { clearInterval(tick); tick = null; }
       mainBtn.textContent = 'Start contraction';
       mainBtn.className = 'bigbtn start';
       runningTimer.classList.add('hidden');
       runningTimer.textContent = '0:00';
-      save();
+    }
+  }
+
+  mainBtn.addEventListener('click', () => {
+    if (!active) {
+      active = { start: Date.now() };
+      updateMainUI();
+      touch();
+    } else {
+      active.end = Date.now();
+      active.duration = active.end - active.start;
+      contractions.push(active);
+      active = null;
+      updateMainUI();
       render();
+      touch();
     }
   });
 
   document.getElementById('undoBtn').addEventListener('click', () => {
     if (active) {
-      clearInterval(tick);
       active = null;
-      mainBtn.textContent = 'Start contraction';
-      mainBtn.className = 'bigbtn start';
-      runningTimer.classList.add('hidden');
+      updateMainUI();
     } else if (contractions.length) {
       contractions.pop();
       render();
     }
-    save();
+    touch();
   });
 
   document.getElementById('resetBtn').addEventListener('click', () => {
     if (confirm('Clear the whole log?')) {
       contractions = [];
-      if (active) { clearInterval(tick); active = null; }
-      mainBtn.textContent = 'Start contraction';
-      mainBtn.className = 'bigbtn start';
-      runningTimer.classList.add('hidden');
-      statusEl.className = 'status';
-      statusEl.textContent = 'Waiting for first contraction';
-      save();
+      active = null;
+      updateMainUI();
       render();
+      touch();
     }
   });
 
-  // ---- init: restore state on load ----
+  // ---- init: restore state, then sync ----
   load();
-  if (active) {
-    mainBtn.textContent = 'Stop contraction';
-    mainBtn.className = 'bigbtn stop';
-    runningTimer.classList.remove('hidden');
-    startTick();
-  }
+  updateMainUI();
   render();
+  setSyncNote(syncOk);
+  pull();
+  setInterval(pull, POLL_MS);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) pull(); });
+  window.addEventListener('online', pull);
 </script>
 </body>
 </html>
