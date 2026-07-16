@@ -3,20 +3,66 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Contraction Timer</title>
+<title>Nika &amp; Olivia ❤️</title>
 <style>
+  :root {
+    --bg: #14110f;
+    --card: #1e1a17;
+    --border: #2c2621;
+    --border2: #241f1b;
+    --text: #f0ece6;
+    --muted: #8a827a;
+    --subtle: #6b635b;
+    --soft: #c9c1b8;
+    --btn-start: #b5442f;
+    --btn-stop: #8a2018;
+    --go-bg: #3a1512; --go-border: #7a2820; --go-text: #ff9d8a;
+    --soon-bg: #33270f; --soon-border: #6b5217; --soon-text: #f0c060;
+    --ok: #6f9a6f;
+    --warn: #b08a4f;
+    --heart: #e0796b;
+  }
+  html[data-theme="light"] {
+    --bg: #f7f1ea;
+    --card: #fffdfa;
+    --border: #e7dccd;
+    --border2: #eee4d7;
+    --text: #3d332b;
+    --muted: #95877a;
+    --subtle: #b3a596;
+    --soft: #6b5d50;
+    --btn-start: #c2503a;
+    --btn-stop: #a03226;
+    --go-bg: #fbe3dd; --go-border: #eeb3a6; --go-text: #a03a26;
+    --soon-bg: #faf0d8; --soon-border: #e6cf96; --soon-text: #8a6d1f;
+    --ok: #4c7d4c;
+    --warn: #9a7433;
+    --heart: #c2503a;
+  }
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    background: #14110f;
-    color: #f0ece6;
+    background: var(--bg);
+    color: var(--text);
     min-height: 100vh;
     padding: 20px 16px 40px;
     max-width: 560px;
     margin: 0 auto;
+    transition: background 0.25s, color 0.25s;
   }
-  h1 { font-size: 20px; font-weight: 600; margin-bottom: 4px; letter-spacing: -0.01em; }
-  .sub { color: #8a827a; font-size: 13px; margin-bottom: 20px; }
+  .top { display: flex; align-items: flex-start; justify-content: space-between; }
+  h1 { font-size: 20px; font-weight: 600; margin-bottom: 2px; letter-spacing: -0.01em; }
+  .dedication { color: var(--heart); font-size: 13px; margin-bottom: 2px; }
+  .sub { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+  .themebtn {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-size: 16px;
+    padding: 7px 10px;
+    cursor: pointer;
+    line-height: 1;
+  }
 
   .stats {
     display: grid;
@@ -25,12 +71,12 @@
     margin-bottom: 18px;
   }
   .stat {
-    background: #1e1a17;
-    border: 1px solid #2c2621;
+    background: var(--card);
+    border: 1px solid var(--border);
     border-radius: 14px;
     padding: 14px;
   }
-  .stat .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #8a827a; margin-bottom: 5px; }
+  .stat .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 5px; }
   .stat .value { font-size: 22px; font-weight: 600; }
   .stat .value.small { font-size: 15px; font-weight: 500; }
 
@@ -41,11 +87,11 @@
     margin-bottom: 16px;
     font-size: 14px;
     font-weight: 500;
-    background: #1e1a17;
-    border: 1px solid #2c2621;
+    background: var(--card);
+    border: 1px solid var(--border);
   }
-  .status.go { background: #3a1512; border-color: #7a2820; color: #ff9d8a; }
-  .status.soon { background: #33270f; border-color: #6b5217; color: #f0c060; }
+  .status.go { background: var(--go-bg); border-color: var(--go-border); color: var(--go-text); }
+  .status.soon { background: var(--soon-bg); border-color: var(--soon-border); color: var(--soon-text); }
 
   .bigbtn {
     width: 100%;
@@ -60,8 +106,8 @@
     margin-bottom: 12px;
   }
   .bigbtn:active { transform: scale(0.98); }
-  .start { background: #b5442f; }
-  .stop { background: #8a2018; animation: pulse 1.4s infinite; }
+  .start { background: var(--btn-start); }
+  .stop { background: var(--btn-stop); animation: pulse 1.4s infinite; }
   @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.82; } }
 
   .running-timer { text-align: center; font-size: 40px; font-weight: 700; margin: 6px 0 14px; font-variant-numeric: tabular-nums; }
@@ -73,35 +119,53 @@
     padding: 12px;
     font-size: 13px;
     border-radius: 10px;
-    border: 1px solid #2c2621;
-    background: #1e1a17;
-    color: #c9c1b8;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--soft);
     cursor: pointer;
   }
-  .secondary button:active { background: #2c2621; }
+  .secondary button:active { background: var(--border); }
 
-  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; color: #8a827a; margin-bottom: 10px; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 10px; }
   .log { list-style: none; }
   .log li {
     display: grid;
-    grid-template-columns: 1fr auto auto;
-    gap: 12px;
+    grid-template-columns: 1fr auto auto auto;
+    gap: 10px;
     align-items: center;
-    padding: 12px 4px;
-    border-bottom: 1px solid #241f1b;
+    padding: 8px 4px;
+    border-bottom: 1px solid var(--border2);
     font-size: 14px;
   }
-  .log li .time { color: #c9c1b8; }
-  .log li .dur { font-variant-numeric: tabular-nums; color: #f0ece6; }
-  .log li .gap { font-variant-numeric: tabular-nums; color: #8a827a; font-size: 12px; min-width: 62px; text-align: right; }
-  .empty { color: #6b635b; font-size: 14px; padding: 8px 4px; }
-  .saved-note { font-size: 11px; color: #6b635b; text-align: center; margin-top: 18px; }
-  .saved-note.ok { color: #6f9a6f; }
-  .saved-note.warn { color: #b08a4f; }
+  .log li .time { color: var(--soft); }
+  .log li .dur { font-variant-numeric: tabular-nums; color: var(--text); }
+  .log li .gap { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 12px; min-width: 52px; text-align: right; }
+  .rowacts { display: flex; gap: 0; }
+  .rowbtn {
+    background: none;
+    border: none;
+    color: var(--subtle);
+    font-size: 15px;
+    padding: 8px 7px;
+    cursor: pointer;
+    line-height: 1;
+  }
+  .rowbtn:active { color: var(--text); }
+  .empty { color: var(--subtle); font-size: 14px; padding: 8px 4px; }
+  .saved-note { font-size: 11px; color: var(--subtle); text-align: center; margin-top: 18px; }
+  .saved-note.ok { color: var(--ok); }
+  .saved-note.warn { color: var(--warn); }
 </style>
+<script>document.documentElement.dataset.theme = (function(){ try { return localStorage.getItem('ctTheme') || 'dark'; } catch(e) { return 'dark'; } })();</script>
 </head>
 <body>
-  <h1>Contraction Timer</h1>
+  <div class="top">
+    <div>
+      <h1>Contraction Timer</h1>
+      <div class="dedication">For Nika, while we wait for little Olivia ❤️</div>
+    </div>
+    <button class="themebtn" id="themeBtn" aria-label="Toggle light/dark">☀️</button>
+  </div>
   <div class="sub">Tap start when one begins, stop when it ends.</div>
 
   <div class="stats">
@@ -135,7 +199,7 @@
 
   <h2>Log</h2>
   <ul class="log" id="logList">
-    <li class="empty">No contractions yet.</li>
+    <li class="empty">No contractions yet — Olivia is taking her time 💛</li>
   </ul>
 
   <div class="saved-note" id="syncNote">Saved automatically to this device.</div>
@@ -151,6 +215,19 @@
   let tick = null;
   let revision = 0;          // wall-clock ms of the last local mutation; higher revision wins
   let syncOk = null;         // null = unknown, true = synced, false = offline/error
+
+  // ---- theme (per-device preference, not synced) ----
+  const themeBtn = document.getElementById('themeBtn');
+  function paintThemeBtn() {
+    themeBtn.textContent = document.documentElement.dataset.theme === 'light' ? '🌙' : '☀️';
+  }
+  themeBtn.addEventListener('click', () => {
+    const next = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
+    document.documentElement.dataset.theme = next;
+    try { localStorage.setItem('ctTheme', next); } catch(e) {}
+    paintThemeBtn();
+  });
+  paintThemeBtn();
 
   // ---- sync room: taken from #r=... in the shared link, then remembered per device ----
   const hashRoom = (location.hash.match(/r=([a-z0-9-]{8,64})/i) || [])[1];
@@ -266,6 +343,40 @@
     return new Date(ts).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
   }
 
+  // ---- edit / delete rows ----
+  function editRow(i) {
+    const c = contractions[i];
+    if (!c) return;
+    const d = new Date(c.start);
+    const timeStr = prompt('Start time (HH:MM)', `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`);
+    if (timeStr === null) return;
+    const tm = timeStr.trim().match(/^(\d{1,2})[:.](\d{2})$/);
+    if (!tm || +tm[1] > 23 || +tm[2] > 59) { alert('Time must be HH:MM, e.g. 14:35'); return; }
+    const durStr = prompt('Duration (m:ss or seconds)', fmtDur(c.duration));
+    if (durStr === null) return;
+    let durMs;
+    const dm = durStr.trim().match(/^(\d+)[:.](\d{1,2})$/);
+    if (dm) durMs = (+dm[1] * 60 + +dm[2]) * 1000;
+    else if (/^\d+s?$/.test(durStr.trim())) durMs = parseInt(durStr, 10) * 1000;
+    else { alert('Duration must be m:ss or seconds, e.g. 1:05 or 45'); return; }
+    if (durMs <= 0 || durMs > 30*60000) { alert('Duration must be between 1s and 30 min'); return; }
+    d.setHours(+tm[1], +tm[2], d.getSeconds(), 0);
+    c.start = d.getTime();
+    c.duration = durMs;
+    c.end = c.start + durMs;
+    contractions.sort((a,b) => a.start - b.start);
+    touch();
+    render();
+  }
+  function deleteRow(i) {
+    const c = contractions[i];
+    if (!c) return;
+    if (!confirm(`Delete the ${fmtClock(c.start)} contraction (${fmtDur(c.duration)})?`)) return;
+    contractions.splice(i, 1);
+    touch();
+    render();
+  }
+
   function render() {
     const n = contractions.length;
     document.getElementById('total').textContent = n;
@@ -295,7 +406,7 @@
     }
 
     if (n === 0) {
-      logList.innerHTML = '<li class="empty">No contractions yet.</li>';
+      logList.innerHTML = '<li class="empty">No contractions yet — Olivia is taking her time 💛</li>';
       return;
     }
     logList.innerHTML = '';
@@ -306,10 +417,21 @@
       if (i > 0) gapTxt = fmtGap(c.start - contractions[i-1].start);
       li.innerHTML = `<span class="time">${fmtClock(c.start)}</span>
                       <span class="dur">${fmtDur(c.duration)}</span>
-                      <span class="gap">${gapTxt}</span>`;
+                      <span class="gap">${gapTxt}</span>
+                      <span class="rowacts">
+                        <button class="rowbtn" data-edit="${i}" aria-label="Edit">✎</button>
+                        <button class="rowbtn" data-del="${i}" aria-label="Delete">✕</button>
+                      </span>`;
       logList.appendChild(li);
     }
   }
+
+  logList.addEventListener('click', (e) => {
+    const btn = e.target.closest('.rowbtn');
+    if (!btn) return;
+    if (btn.dataset.edit !== undefined) editRow(+btn.dataset.edit);
+    else if (btn.dataset.del !== undefined) deleteRow(+btn.dataset.del);
+  });
 
   function updateStatus(avgGap) {
     const mins = avgGap / 60000;
@@ -318,12 +440,12 @@
     statusEl.className = 'status';
     if (mins <= 5 && avgD >= 0.9) {
       statusEl.className = 'status go';
-      statusEl.textContent = '5-1-1 reached — call fødetelefon 51 80 42 01';
+      statusEl.textContent = '5-1-1 reached — Olivia is coming! Call fødetelefon 51 80 42 01';
     } else if (mins <= 8) {
       statusEl.className = 'status soon';
       statusEl.textContent = 'Getting closer — keep tracking, prep to go';
     } else {
-      statusEl.textContent = 'Early labour — rest, hydrate, conserve energy';
+      statusEl.textContent = 'Early labour — rest, hydrate, conserve energy 💛';
     }
   }
 
