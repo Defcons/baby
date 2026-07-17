@@ -61,6 +61,14 @@
     line-height: 1;
   }
 
+  .avgwin { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .avgwin label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+  .avgwin select {
+    flex: 1; padding: 8px 10px; font-size: 13px;
+    border-radius: 10px; border: 1px solid var(--border);
+    background: var(--card); color: var(--soft);
+  }
+
   .stats {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -195,13 +203,26 @@
   </div>
   <div class="sub">Tap start when one begins, stop when it ends.</div>
 
+  <div class="avgwin">
+    <label for="avgWindowSel">Average over</label>
+    <select id="avgWindowSel">
+      <option value="5">Last 5</option>
+      <option value="8">Last 8</option>
+      <option value="10">Last 10</option>
+      <option value="15m">Last 15 min</option>
+      <option value="30m">Last 30 min</option>
+      <option value="60m">Last 1 hour</option>
+      <option value="120m">Last 2 hours</option>
+    </select>
+  </div>
+
   <div class="stats">
     <div class="stat">
-      <div class="label">Avg frequency (last 5)</div>
+      <div class="label" id="avgFreqLabel">Avg frequency (last 5)</div>
       <div class="value" id="avgFreq">—</div>
     </div>
     <div class="stat">
-      <div class="label">Avg duration (last 5)</div>
+      <div class="label" id="avgDurLabel">Avg duration (last 5)</div>
       <div class="value" id="avgDur">—</div>
     </div>
     <div class="stat">
@@ -277,6 +298,40 @@
     try { localStorage.setItem('ctTheme', next); } catch(e) {}
     paintThemeBtn();
   });
+
+  // ---- average window (per-device preference, not synced): count of contractions or a time span ----
+  const AVG_WINDOW_KEY = 'ctAvgWindow';
+  let avgWindow = (function(){ try { return localStorage.getItem(AVG_WINDOW_KEY) || '5'; } catch(e) { return '5'; } })();
+  const avgWindowSel = document.getElementById('avgWindowSel');
+  avgWindowSel.value = avgWindow;
+  avgWindowSel.addEventListener('change', () => {
+    avgWindow = avgWindowSel.value;
+    try { localStorage.setItem(AVG_WINDOW_KEY, avgWindow); } catch(e) {}
+    render();
+  });
+  function windowLabel() {
+    if (avgWindow.endsWith('m')) {
+      const mins = parseInt(avgWindow, 10);
+      return mins % 60 === 0 ? `last ${mins/60}h` : `last ${mins}m`;
+    }
+    return `last ${avgWindow}`;
+  }
+  // contractions used for gap averaging: time mode -> those within the span; count mode -> need N+1 to get N gaps
+  function windowSetForGaps() {
+    if (avgWindow.endsWith('m')) {
+      const cutoff = Date.now() - parseInt(avgWindow, 10) * 60000;
+      return contractions.filter(c => c.start >= cutoff);
+    }
+    return contractions.slice(-(parseInt(avgWindow, 10) + 1));
+  }
+  // contractions used for duration averaging
+  function windowSetForDuration() {
+    if (avgWindow.endsWith('m')) {
+      const cutoff = Date.now() - parseInt(avgWindow, 10) * 60000;
+      return contractions.filter(c => c.start >= cutoff);
+    }
+    return contractions.slice(-parseInt(avgWindow, 10));
+  }
   paintThemeBtn();
 
   // ---- sync room: taken from #r=... in the shared link, then remembered per device ----
@@ -462,28 +517,29 @@
     const n = contractions.length;
     document.getElementById('total').textContent = n;
 
-    if (n >= 2) {
-      const recent = contractions.slice(-6);
+    const wl = windowLabel();
+    document.getElementById('avgFreqLabel').textContent = `Avg frequency (${wl})`;
+    document.getElementById('avgDurLabel').textContent = `Avg duration (${wl})`;
+
+    document.getElementById('lastGap').textContent = n >= 2 ? fmtGap(contractions[n-1].start - contractions[n-2].start) : '—';
+
+    const durSet = windowSetForDuration();
+    const avgD = durSet.length ? durSet.reduce((a,b)=>a+b.duration,0)/durSet.length : null;
+    document.getElementById('avgDur').textContent = avgD !== null ? fmtDur(avgD) : '—';
+
+    const gapSet = windowSetForGaps();
+    if (gapSet.length >= 2) {
       const gaps = [];
-      for (let i = 1; i < recent.length; i++) gaps.push(recent[i].start - recent[i-1].start);
-      const last5gaps = gaps.slice(-5);
-      const avgGap = last5gaps.reduce((a,b)=>a+b,0)/last5gaps.length;
+      for (let i = 1; i < gapSet.length; i++) gaps.push(gapSet[i].start - gapSet[i-1].start);
+      const avgGap = gaps.reduce((a,b)=>a+b,0)/gaps.length;
       document.getElementById('avgFreq').textContent = fmtGap(avgGap);
-      document.getElementById('lastGap').textContent = fmtGap(gaps[gaps.length-1]);
-      updateStatus(avgGap);
+      updateStatus(avgGap, avgD);
     } else {
       document.getElementById('avgFreq').textContent = '—';
-      document.getElementById('lastGap').textContent = '—';
       statusEl.className = 'status';
-      statusEl.textContent = n === 1 ? 'First contraction logged — keep tracking' : 'Waiting for first contraction';
-    }
-
-    if (n >= 1) {
-      const last5 = contractions.slice(-5);
-      const avgD = last5.reduce((a,b)=>a+b.duration,0)/last5.length;
-      document.getElementById('avgDur').textContent = fmtDur(avgD);
-    } else {
-      document.getElementById('avgDur').textContent = '—';
+      if (n === 0) statusEl.textContent = 'Waiting for first contraction';
+      else if (n === 1) statusEl.textContent = 'First contraction logged — keep tracking';
+      else statusEl.textContent = 'Not enough contractions in this window yet';
     }
 
     if (n === 0) {
@@ -514,10 +570,9 @@
     else if (btn.dataset.del !== undefined) deleteRow(+btn.dataset.del);
   });
 
-  function updateStatus(avgGap) {
+  function updateStatus(avgGap, avgDurMs) {
     const mins = avgGap / 60000;
-    const last5 = contractions.slice(-5);
-    const avgD = last5.reduce((a,b)=>a+b.duration,0)/last5.length / 60000;
+    const avgD = avgDurMs !== null ? avgDurMs / 60000 : 0;
     statusEl.className = 'status';
     if (mins <= 5 && avgD >= 0.9) {
       statusEl.className = 'status go';
@@ -596,6 +651,7 @@
   setSyncNote(syncOk);
   pull();
   setInterval(pull, POLL_MS);
+  setInterval(() => { if (avgWindow.endsWith('m')) render(); }, 15000); // keep time-based windows current as contractions age out
   document.addEventListener('visibilitychange', () => { if (!document.hidden) pull(); });
   window.addEventListener('online', pull);
 </script>
