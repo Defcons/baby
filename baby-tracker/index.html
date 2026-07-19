@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Baby Tracker</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#14110f">
 <style>
   :root {
     --bg: #14110f;
@@ -193,6 +196,18 @@
   /* login gate */
   #loginOverlay { background: var(--bg); z-index: 20; }
 
+  /* alerts modal */
+  .alertrow { display: flex; align-items: center; gap: 8px; padding: 7px 0; font-size: 14px; }
+  .alertrow span { flex: 1; }
+  .alertrow input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent); }
+  .alertrow select {
+    width: 96px; padding: 8px 6px; font-size: 14px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--bg); color: var(--text);
+  }
+  .pushstatus { font-size: 12px; color: var(--muted); line-height: 1.5; }
+  .pushstatus.ok { color: var(--ok); }
+  .pushstatus.warn { color: var(--warn); }
+
   /* start-timer button inside nurse/sleep modals */
   .modalstart {
     width: 100%; padding: 13px; font-size: 14px; font-weight: 600;
@@ -247,6 +262,7 @@
     </div>
     <div class="topbtns">
       <a class="navlink" href="../contraction-tracker/" title="Contraction timer">⏱️</a>
+      <button class="themebtn" id="alertsBtn" aria-label="Alerts &amp; notifications">🔔</button>
       <button class="themebtn" id="themeBtn" aria-label="Toggle light/dark">☀️</button>
     </div>
   </div>
@@ -321,6 +337,31 @@
       <div class="err" id="loginErr"></div>
       <div class="btns">
         <button class="primary" id="loginBtn">Sign in</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Alerts & notifications modal -->
+  <div class="overlay" id="alertsOverlay">
+    <div class="modal">
+      <h3>Alerts &amp; notifications</h3>
+      <div class="field">
+        <label>This device</label>
+        <div class="pushstatus" id="pushStatus">Checking…</div>
+        <div class="btns" style="margin-top:10px;">
+          <button class="primary" id="pushToggle">Enable notifications</button>
+          <button id="pushTest" style="display:none;">Send test</button>
+        </div>
+      </div>
+      <div class="field" style="margin-top:16px;">
+        <label>Remind us when (shared between devices)</label>
+        <div class="alertrow"><input type="checkbox" id="alFeedOn"><span>🍼 No feed for</span><select id="alFeedMin"></select></div>
+        <div class="alertrow"><input type="checkbox" id="alDiaperOn"><span>💧 No diaper for</span><select id="alDiaperMin"></select></div>
+        <div class="alertrow"><input type="checkbox" id="alAwakeOn"><span>☀️ Awake for</span><select id="alAwakeMin"></select></div>
+        <div class="alertrow"><input type="checkbox" id="alSleepOn"><span>😴 Asleep for</span><select id="alSleepMin"></select></div>
+      </div>
+      <div class="btns">
+        <button id="alertsClose">Close</button>
       </div>
     </div>
   </div>
@@ -532,9 +573,21 @@
   const PASS_SHA256 = '766724e2275657b656fcc8f94ecacadff3a798689303c5aa4d0e579ced7066b9';
   const SYNC_URL = 'https://baby-tracker-sync.davidsen908.workers.dev';
   const POLL_MS = 4000;
+  const VAPID_PUBLIC = 'BEhnWFpfkQFW6KpxWhLtJOhj6I8TH4O0Nf9YuS4Ai-cHY0Q5BLB0YYhxyZECd0c6TNQuBhoze8BqXjTuAO3QAWY';
+  const PUSH_FLAG = 'btPushOn_v1'; // per-device: user enabled notifications here
+
+  function defaultAlerts() {
+    return {
+      feed:   { on: false, min: 180 },
+      diaper: { on: false, min: 240 },
+      awake:  { on: false, min: 120 },
+      sleep:  { on: false, min: 180 },
+    };
+  }
 
   let entries = [];              // all logged activity entries
   let active = { sleep: null, nurse: null }; // in-progress timers: {start[, side]}
+  let alerts = defaultAlerts();  // shared alert rules (synced; evaluated by the worker cron)
   let tick = null;
   let revision = 0;
   let syncOk = null;
@@ -580,7 +633,7 @@
   // ---- persistence ----
   function save() {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ revision, entries, active }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ revision, entries, active, alerts }));
     } catch(e) { /* private mode / full storage - ignore */ }
   }
   function load() {
@@ -591,6 +644,7 @@
         revision = data.revision || 0;
         entries = data.entries || [];
         active = data.active || { sleep: null, nurse: null };
+        alerts = data.alerts || defaultAlerts();
       }
     } catch(e) { entries = []; }
   }
@@ -618,7 +672,7 @@
     fetch(`${SYNC_URL}/state/${room}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ revision, entries, active }),
+      body: JSON.stringify({ revision, entries, active, alerts }),
     })
       .then(r => { syncOk = r.ok; setSyncNote(syncOk); })
       .catch(() => { syncOk = false; setSyncNote(false); });
@@ -628,8 +682,10 @@
     revision = remote.revision;
     entries = remote.entries || [];
     active = remote.active || { sleep: null, nurse: null };
+    alerts = remote.alerts || defaultAlerts();
     save();
     updateActionUI();
+    paintAlertRules();
     render();
   }
 
@@ -1168,12 +1224,142 @@
     closeEdit();
   });
 
+  // ---- alerts & push notifications ----
+  // Rules are shared state (synced, evaluated server-side by the worker cron);
+  // the push subscription is per-device.
+  const RULES = [
+    { key: 'feed',   on: 'alFeedOn',   min: 'alFeedMin' },
+    { key: 'diaper', on: 'alDiaperOn', min: 'alDiaperMin' },
+    { key: 'awake',  on: 'alAwakeOn',  min: 'alAwakeMin' },
+    { key: 'sleep',  on: 'alSleepOn',  min: 'alSleepMin' },
+  ];
+  const DUR_OPTS = [30, 45, 60, 90, 120, 150, 180, 210, 240, 300, 360, 480, 720];
+  function durLabel(min) {
+    const h = Math.floor(min / 60), m = min % 60;
+    return h > 0 ? (m ? `${h}h ${m}m` : `${h}h`) : `${m}m`;
+  }
+  for (const r of RULES) {
+    const sel = document.getElementById(r.min);
+    sel.innerHTML = DUR_OPTS.map(v => `<option value="${v}">${durLabel(v)}</option>`).join('');
+    sel.addEventListener('change', () => { alerts[r.key].min = +sel.value; touch(); });
+    document.getElementById(r.on).addEventListener('change', (e) => { alerts[r.key].on = e.target.checked; touch(); });
+  }
+  function paintAlertRules() {
+    for (const r of RULES) {
+      document.getElementById(r.on).checked = !!alerts[r.key].on;
+      document.getElementById(r.min).value = String(alerts[r.key].min);
+    }
+  }
+
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  const pushSupported = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+  const pushStatus = document.getElementById('pushStatus');
+  const pushToggle = document.getElementById('pushToggle');
+  const pushTest = document.getElementById('pushTest');
+
+  function b64uToU8(s) {
+    const b = s.replace(/-/g, '+').replace(/_/g, '/');
+    return Uint8Array.from(atob(b + '='.repeat((4 - b.length % 4) % 4)), c => c.charCodeAt(0));
+  }
+  function setPushStatus(cls, msg) { pushStatus.className = 'pushstatus' + (cls ? ' ' + cls : ''); pushStatus.textContent = msg; }
+
+  function updatePushUI() {
+    pushTest.style.display = 'none';
+    if (!pushSupported()) {
+      pushToggle.style.display = 'none';
+      if (isIOS && !isStandalone()) setPushStatus('warn', 'On iPhone: tap Share → “Add to Home Screen”, then open the app from its icon to enable notifications.');
+      else setPushStatus('warn', 'Notifications are not supported in this browser.');
+      return;
+    }
+    pushToggle.style.display = '';
+    if (localStorage.getItem(PUSH_FLAG) && Notification.permission === 'granted') {
+      setPushStatus('ok', 'Notifications are ON for this device ✓');
+      pushToggle.textContent = 'Disable notifications';
+      pushTest.style.display = '';
+    } else if (Notification.permission === 'denied') {
+      setPushStatus('warn', 'Notifications are blocked — allow them for this site in your browser/system settings, then try again.');
+      pushToggle.textContent = 'Enable notifications';
+    } else {
+      setPushStatus('', 'Get reminders on this phone even when the app is closed.');
+      pushToggle.textContent = 'Enable notifications';
+    }
+  }
+
+  async function subscribePush() {
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64uToU8(VAPID_PUBLIC) });
+    const r = await fetch(`${SYNC_URL}/subscribe/${room}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(sub.toJSON()),
+    });
+    if (!r.ok) throw new Error('subscribe failed');
+  }
+
+  pushToggle.addEventListener('click', async () => {
+    if (!room) return;
+    try {
+      if (localStorage.getItem(PUSH_FLAG) && Notification.permission === 'granted') {
+        const reg = await navigator.serviceWorker.ready;
+        const sub = await reg.pushManager.getSubscription();
+        if (sub) {
+          await fetch(`${SYNC_URL}/unsubscribe/${room}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ endpoint: sub.endpoint }),
+          });
+          await sub.unsubscribe();
+        }
+        localStorage.removeItem(PUSH_FLAG);
+      } else {
+        const perm = await Notification.requestPermission();
+        if (perm !== 'granted') { updatePushUI(); return; }
+        await subscribePush();
+        localStorage.setItem(PUSH_FLAG, '1');
+      }
+    } catch (e) {
+      setPushStatus('warn', 'Could not update notifications — check your connection and try again.');
+      return;
+    }
+    updatePushUI();
+  });
+
+  pushTest.addEventListener('click', async () => {
+    pushTest.disabled = true;
+    try {
+      const r = await fetch(`${SYNC_URL}/test/${room}`, { method: 'POST' });
+      const d = await r.json();
+      setPushStatus('ok', `Test sent to ${d.devices} device${d.devices === 1 ? '' : 's'} (status ${d.statuses.join(', ')}). It can take a few seconds to appear.`);
+    } catch (e) {
+      setPushStatus('warn', 'Test failed — check your connection.');
+    }
+    pushTest.disabled = false;
+  });
+
+  // Keep the server's copy of this device's subscription fresh (push services
+  // can rotate subscriptions).
+  async function ensurePush() {
+    if (!room || !pushSupported() || !localStorage.getItem(PUSH_FLAG) || Notification.permission !== 'granted') return;
+    try { await subscribePush(); } catch (e) {}
+  }
+
+  document.getElementById('alertsBtn').addEventListener('click', () => {
+    paintAlertRules();
+    updatePushUI();
+    openOverlay('alertsOverlay');
+  });
+  document.getElementById('alertsClose').addEventListener('click', () => closeOverlay('alertsOverlay'));
+  document.getElementById('alertsOverlay').addEventListener('click', (e) => { if (e.target.id === 'alertsOverlay') closeOverlay('alertsOverlay'); });
+
   // ---- init: restore state, then sync ----
   load();
   updateActionUI();
   render();
   setSyncNote(syncOk);
   if (!room) openOverlay('loginOverlay');
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').then(ensurePush).catch(() => {});
   pull();
   setInterval(pull, POLL_MS);
   setInterval(() => { updateStats(); renderTimeline(); }, 15000);

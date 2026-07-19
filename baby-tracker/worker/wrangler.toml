@@ -2,6 +2,10 @@ name = "baby-tracker-sync"
 main = "index.js"
 compatibility_date = "2026-07-16"
 
+# alert evaluation cadence (worker cron, free tier)
+[triggers]
+crons = ["*/5 * * * *"]
+
 [[kv_namespaces]]
 binding = "STATE"
 id = "d0e1e25d72af45f8991ba4847091fed6"
