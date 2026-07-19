@@ -189,6 +189,54 @@
   .saved-note { font-size: 11px; color: var(--subtle); text-align: center; margin-top: 18px; }
   .saved-note.ok { color: var(--ok); }
   .saved-note.warn { color: var(--warn); }
+
+  /* login gate */
+  #loginOverlay { background: var(--bg); z-index: 20; }
+
+  /* start-timer button inside nurse/sleep modals */
+  .modalstart {
+    width: 100%; padding: 13px; font-size: 14px; font-weight: 600;
+    border-radius: 10px; border: 1px solid var(--accent2);
+    background: var(--accent); color: #fff; cursor: pointer;
+  }
+  .ordivider {
+    text-align: center; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--subtle); margin: 14px 0 6px;
+  }
+
+  /* scroll-wheel picker */
+  .wheelrow { display: flex; justify-content: center; gap: 18px; margin: 6px 0 2px; }
+  .wheelcol { text-align: center; }
+  .wheel {
+    height: 132px; width: 72px; overflow-y: scroll; scroll-snap-type: y mandatory;
+    border: 1px solid var(--border); border-radius: 12px; background: var(--bg);
+    scrollbar-width: none;
+    -webkit-mask-image: linear-gradient(transparent, #000 28%, #000 72%, transparent);
+    mask-image: linear-gradient(transparent, #000 28%, #000 72%, transparent);
+  }
+  .wheel::-webkit-scrollbar { display: none; }
+  .wheel .pad { height: 44px; }
+  .wheel .wv {
+    height: 44px; line-height: 44px; text-align: center; scroll-snap-align: center;
+    font-size: 20px; color: var(--subtle); font-variant-numeric: tabular-nums;
+  }
+  .wheel .wv.sel { color: var(--text); font-weight: 600; }
+  .wheellabel { font-size: 11px; color: var(--muted); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.05em; }
+
+  /* 24h timeline */
+  .tl { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 10px 12px 8px; }
+  .tlrow { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .tlico { font-size: 13px; width: 18px; text-align: center; flex: none; }
+  .tltrack { position: relative; flex: 1; height: 14px; background: var(--bg); border-radius: 4px; overflow: hidden; }
+  .tlbar { position: absolute; top: 2px; bottom: 2px; border-radius: 3px; }
+  .tlbar.live { animation: pulse 1.4s infinite; }
+  .tldot { position: absolute; top: 50%; width: 7px; height: 7px; border-radius: 50%; transform: translate(-50%,-50%); }
+  .tlaxis { display: flex; justify-content: space-between; font-size: 10px; color: var(--subtle); padding: 2px 0 0 26px; }
+  .tlbar.sleep, .tldot.sleep { background: var(--accent); }
+  .tlbar.nurse, .tldot.nurse { background: #c76e9d; }
+  .tlbar.bottle, .tldot.bottle { background: var(--warn); }
+  .tldot.diaper { background: #55a0a0; }
+  .tldot.solid { background: var(--ok); }
 </style>
 <script>document.documentElement.dataset.theme = (function(){ try { return localStorage.getItem('btTheme') || 'dark'; } catch(e) { return 'dark'; } })();</script>
 </head>
@@ -235,15 +283,15 @@
     </button>
     <button class="actionbtn" id="bottleBtn">
       <span class="ico">🍼</span>Bottle
-      <span class="sub2">Amount &amp; type</span>
+      <span class="sub2" id="bottleBtnSub">Amount &amp; type</span>
     </button>
     <button class="actionbtn" id="diaperBtn">
       <span class="ico">💧</span>Diaper
-      <span class="sub2">Wet / dirty</span>
+      <span class="sub2" id="diaperBtnSub">Wet / dirty</span>
     </button>
     <button class="actionbtn wide" id="solidBtn">
       <span class="ico">🥄</span>Solids
-      <span class="sub2">What &amp; when</span>
+      <span class="sub2" id="solidBtnSub">What &amp; when</span>
     </button>
   </div>
   <div class="sidepick" id="nurseSidePick" style="display:none;">
@@ -252,12 +300,81 @@
     <button data-side="both">Both</button>
   </div>
 
+  <h2>Last 24 hours</h2>
+  <div class="tl" id="timeline"></div>
+
   <h2>Log</h2>
   <ul class="log" id="logList">
     <li class="empty">Nothing logged yet.</li>
   </ul>
 
   <div class="saved-note" id="syncNote">Saved automatically to this device.</div>
+
+  <!-- Login gate -->
+  <div class="overlay" id="loginOverlay">
+    <div class="modal">
+      <h3>Sign in</h3>
+      <div class="field">
+        <label for="loginPass">Password</label>
+        <input type="password" id="loginPass" autocomplete="current-password">
+      </div>
+      <div class="err" id="loginErr"></div>
+      <div class="btns">
+        <button class="primary" id="loginBtn">Sign in</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Nurse modal: start timer or log a finished nurse -->
+  <div class="overlay" id="nurseOverlay">
+    <div class="modal">
+      <h3>Nurse</h3>
+      <div class="field">
+        <label>Side</label>
+        <div class="choicebtns" id="nurseModalSide">
+          <button data-val="L">Left</button>
+          <button data-val="R">Right</button>
+          <button data-val="both">Both</button>
+        </div>
+      </div>
+      <button class="modalstart" id="nurseStartTimer">▶ Start timer</button>
+      <div class="ordivider">or already nursed for</div>
+      <div class="wheelrow">
+        <div class="wheelcol">
+          <div class="wheel" id="nurseMinWheel"></div>
+          <div class="wheellabel">min</div>
+        </div>
+      </div>
+      <div class="btns">
+        <button id="nurseCancel">Cancel</button>
+        <button class="primary" id="nurseLogSave">Nursed ✓</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sleep modal: start timer or log a finished sleep -->
+  <div class="overlay" id="sleepOverlay">
+    <div class="modal">
+      <h3>Sleep</h3>
+      <button class="modalstart" id="sleepStartTimer">▶ Start sleep</button>
+      <div class="ordivider">or already slept for</div>
+      <div class="wheelrow">
+        <div class="wheelcol">
+          <div class="wheel" id="sleepHourWheel"></div>
+          <div class="wheellabel">hours</div>
+        </div>
+        <div class="wheelcol">
+          <div class="wheel" id="sleepMinWheel"></div>
+          <div class="wheellabel">min</div>
+        </div>
+      </div>
+      <div class="err" id="sleepErr"></div>
+      <div class="btns">
+        <button id="sleepCancel">Cancel</button>
+        <button class="primary" id="sleepLogSave">Slept ✓</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Bottle modal -->
   <div class="overlay" id="bottleOverlay">
@@ -409,7 +526,10 @@
 
 <script>
   const STORAGE_KEY = 'babyLog_v1';
-  const ROOM_KEY = 'babySyncRoom_v1';
+  const AUTH_KEY = 'babyAuthRoom_v1';
+  // sha256 of the shared password; the sync room id is derived from the password itself,
+  // so it never appears in this (public) repo
+  const PASS_SHA256 = '4f65fafea8843912108953ae378248b7af7c0efb5dd2abea48784fb924861732';
   const SYNC_URL = 'https://baby-tracker-sync.davidsen908.workers.dev';
   const POLL_MS = 4000;
 
@@ -432,10 +552,30 @@
   });
   paintThemeBtn();
 
-  // ---- sync room: taken from #r=... in the shared link, then remembered per device ----
-  const hashRoom = (location.hash.match(/r=([a-z0-9-]{8,64})/i) || [])[1];
-  if (hashRoom) { try { localStorage.setItem(ROOM_KEY, hashRoom.toLowerCase()); } catch(e) {} }
-  const room = hashRoom ? hashRoom.toLowerCase() : (localStorage.getItem(ROOM_KEY) || null);
+  // ---- login gate: password unlocks the app; the sync room id is derived from the
+  // password, so every device that signs in lands in the same room automatically ----
+  let room = (function(){ try { return localStorage.getItem(AUTH_KEY) || null; } catch(e) { return null; } })();
+
+  async function sha256Hex(str) {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+  }
+  const loginPass = document.getElementById('loginPass');
+  async function doLogin() {
+    const pw = loginPass.value;
+    if (!pw) return;
+    let hash;
+    try { hash = await sha256Hex(pw); } catch(e) { showErr('loginErr', 'Needs a secure (https) connection'); return; }
+    if (hash !== PASS_SHA256) { showErr('loginErr', 'Wrong password'); return; }
+    room = (await sha256Hex('baby-room-v1:' + pw)).slice(0, 32);
+    try { localStorage.setItem(AUTH_KEY, room); } catch(e) {}
+    loginPass.value = '';
+    closeOverlay('loginOverlay');
+    setSyncNote(syncOk);
+    pull();
+  }
+  document.getElementById('loginBtn').addEventListener('click', doLogin);
+  loginPass.addEventListener('keydown', (e) => { if (e.key === 'Enter') doLogin(); });
 
   // ---- persistence ----
   function save() {
@@ -460,7 +600,7 @@
     const el = document.getElementById('syncNote');
     if (!room) {
       el.className = 'saved-note';
-      el.textContent = 'Saved to this device only — open the shared sync link to share the log.';
+      el.textContent = 'Not signed in — saved to this device only.';
     } else if (state === true) {
       el.className = 'saved-note ok';
       el.textContent = 'Synced across devices ✓';
@@ -587,6 +727,15 @@
     for (const e of entries) if (e.type === 'diaper' && (best === null || e.start > best)) best = e.start;
     return best;
   }
+  function lastOfType(type) {
+    let best = null;
+    for (const e of entries) if (e.type === type) { const t = e.end || e.start; if (best === null || t > best) best = t; }
+    return best;
+  }
+  function agoOr(type, fallback) {
+    const t = lastOfType(type);
+    return t ? fmtShort(Date.now() - t) + ' ago' : fallback;
+  }
   function startOfToday() {
     const d = new Date(); d.setHours(0,0,0,0); return d.getTime();
   }
@@ -623,10 +772,53 @@
     const feedCount = todays.filter(e => e.type === 'nurse' || e.type === 'bottle' || e.type === 'solid').length;
     const diaperCount = todays.filter(e => e.type === 'diaper').length;
     document.getElementById('todaySummary').textContent = `${feedCount} feed${feedCount===1?'':'s'} · ${diaperCount} diaper${diaperCount===1?'':'s'}`;
+
+    // "(X ago)" on the action buttons; running timers own their own sub text
+    if (!active.sleep) sleepBtnSub.textContent = agoOr('sleep', 'Tap to start');
+    if (!active.nurse) nurseBtnSub.textContent = agoOr('nurse', 'Tap to start');
+    document.getElementById('bottleBtnSub').textContent = agoOr('bottle', 'Amount & type');
+    document.getElementById('diaperBtnSub').textContent = agoOr('diaper', 'Wet / dirty');
+    document.getElementById('solidBtnSub').textContent = agoOr('solid', 'What & when');
+  }
+
+  // ---- last-24h timeline: one lane per activity type; bars for durations, dots for events ----
+  const TL_TYPES = [
+    { type: 'sleep', ico: '😴' },
+    { type: 'nurse', ico: '🤱' },
+    { type: 'bottle', ico: '🍼' },
+    { type: 'diaper', ico: '💧' },
+    { type: 'solid', ico: '🥄' },
+  ];
+  function renderTimeline() {
+    const now = Date.now();
+    const from = now - 24 * 3600000;
+    const pct = (t) => (t - from) / (24 * 3600000) * 100;
+    let html = '';
+    for (const t of TL_TYPES) {
+      let evs = '';
+      for (const e of entries) {
+        if (e.type !== t.type || (e.end || e.start) < from) continue;
+        if (e.end) {
+          const l = Math.max(0, pct(e.start)), r = Math.min(100, pct(e.end));
+          evs += `<span class="tlbar ${t.type}" style="left:${l}%;width:${Math.max(r - l, 0.7)}%"></span>`;
+        } else {
+          evs += `<span class="tldot ${t.type}" style="left:${pct(e.start)}%"></span>`;
+        }
+      }
+      const a = active[t.type];
+      if (a) {
+        const l = Math.max(0, pct(a.start));
+        evs += `<span class="tlbar live ${t.type}" style="left:${l}%;width:${Math.max(100 - l, 0.7)}%"></span>`;
+      }
+      html += `<div class="tlrow"><span class="tlico">${t.ico}</span><div class="tltrack">${evs}</div></div>`;
+    }
+    html += '<div class="tlaxis"><span>24h ago</span><span>18h</span><span>12h</span><span>6h</span><span>now</span></div>';
+    document.getElementById('timeline').innerHTML = html;
   }
 
   function render() {
     updateStats();
+    renderTimeline();
     const sorted = entries.slice().sort((a,b) => a.start - b.start);
     if (sorted.length === 0) {
       logList.innerHTML = '<li class="empty">Nothing logged yet.</li>';
@@ -692,7 +884,7 @@
       sleepBtnSub.textContent = 'Tap to wake';
     } else {
       sleepBtn.classList.remove('running');
-      sleepBtnSub.textContent = 'Tap to start';
+      sleepBtnSub.textContent = agoOr('sleep', 'Tap to start');
     }
     if (active.nurse) {
       nurseBtn.classList.add('running');
@@ -701,7 +893,7 @@
       nurseSide = active.nurse.side;
     } else {
       nurseBtn.classList.remove('running');
-      nurseBtnSub.textContent = 'Tap to start';
+      nurseBtnSub.textContent = agoOr('nurse', 'Tap to start');
       nurseSidePick.style.display = 'none';
     }
     paintNurseSide();
@@ -718,27 +910,21 @@
   }
 
   sleepBtn.addEventListener('click', () => {
-    if (!active.sleep) {
-      active.sleep = { start: Date.now() };
-    } else {
-      const end = Date.now();
-      entries.push({ id: 's'+active.sleep.start, type: 'sleep', start: active.sleep.start, end, duration: end - active.sleep.start });
-      active.sleep = null;
-      render();
-    }
+    if (!active.sleep) { openSleepModal(); return; }
+    const end = Date.now();
+    entries.push({ id: 's'+active.sleep.start, type: 'sleep', start: active.sleep.start, end, duration: end - active.sleep.start });
+    active.sleep = null;
+    render();
     updateActionUI();
     touch();
   });
 
   nurseBtn.addEventListener('click', () => {
-    if (!active.nurse) {
-      active.nurse = { start: Date.now(), side: nurseSide };
-    } else {
-      const end = Date.now();
-      entries.push({ id: 'n'+active.nurse.start, type: 'nurse', start: active.nurse.start, end, duration: end - active.nurse.start, side: active.nurse.side });
-      active.nurse = null;
-      render();
-    }
+    if (!active.nurse) { openNurseModal(); return; }
+    const end = Date.now();
+    entries.push({ id: 'n'+active.nurse.start, type: 'nurse', start: active.nurse.start, end, duration: end - active.nurse.start, side: active.nurse.side });
+    active.nurse = null;
+    render();
     updateActionUI();
     touch();
   });
@@ -757,6 +943,85 @@
   }
   function showErr(id, msg) { const el = document.getElementById(id); el.textContent = msg; el.style.display = 'block'; }
   function hideErr(id) { document.getElementById(id).style.display = 'none'; }
+
+  // ---- nurse/sleep modals: start the timer, or log an already-finished session
+  // via a snap-scrolling wheel picker ----
+  function makeWheel(id, values) {
+    const el = document.getElementById(id);
+    const ITEM = 44; // must match .wheel .wv height
+    el.innerHTML = '<div class="pad"></div>' + values.map(v => `<div class="wv">${v}</div>`).join('') + '<div class="pad"></div>';
+    const items = el.querySelectorAll('.wv');
+    let idx = 0;
+    function paint() { items.forEach((it, i) => it.classList.toggle('sel', i === idx)); }
+    el.addEventListener('scroll', () => {
+      const i = Math.max(0, Math.min(values.length - 1, Math.round(el.scrollTop / ITEM)));
+      if (i !== idx) { idx = i; paint(); }
+    });
+    function set(v) { // only works while the wheel is visible (overlay open)
+      idx = Math.max(0, values.indexOf(v));
+      el.scrollTop = idx * ITEM;
+      paint();
+    }
+    return { get: () => values[idx], set };
+  }
+  function range(a, b, step) { const r = []; for (let v = a; v <= b; v += step || 1) r.push(v); return r; }
+  const nurseMinWheel = makeWheel('nurseMinWheel', range(1, 90));
+  const sleepHourWheel = makeWheel('sleepHourWheel', range(0, 16));
+  const sleepMinWheel = makeWheel('sleepMinWheel', range(0, 55, 5));
+
+  // Nurse modal
+  document.getElementById('nurseModalSide').addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    nurseSide = b.dataset.val;
+    try { localStorage.setItem(NURSE_SIDE_KEY, nurseSide); } catch(err) {}
+    setChoiceSel('nurseModalSide', nurseSide);
+  });
+  function openNurseModal() {
+    setChoiceSel('nurseModalSide', nurseSide);
+    openOverlay('nurseOverlay');
+    nurseMinWheel.set(15);
+  }
+  document.getElementById('nurseCancel').addEventListener('click', () => closeOverlay('nurseOverlay'));
+  document.getElementById('nurseOverlay').addEventListener('click', (e) => { if (e.target.id === 'nurseOverlay') closeOverlay('nurseOverlay'); });
+  document.getElementById('nurseStartTimer').addEventListener('click', () => {
+    active.nurse = { start: Date.now(), side: nurseSide };
+    closeOverlay('nurseOverlay');
+    updateActionUI();
+    touch();
+  });
+  document.getElementById('nurseLogSave').addEventListener('click', () => {
+    const end = Date.now();
+    const start = end - nurseMinWheel.get() * 60000;
+    entries.push({ id: 'n'+start, type: 'nurse', start, end, duration: end - start, side: nurseSide });
+    closeOverlay('nurseOverlay');
+    touch(); render();
+  });
+
+  // Sleep modal
+  function openSleepModal() {
+    hideErr('sleepErr');
+    openOverlay('sleepOverlay');
+    sleepHourWheel.set(0);
+    sleepMinWheel.set(30);
+  }
+  document.getElementById('sleepCancel').addEventListener('click', () => closeOverlay('sleepOverlay'));
+  document.getElementById('sleepOverlay').addEventListener('click', (e) => { if (e.target.id === 'sleepOverlay') closeOverlay('sleepOverlay'); });
+  document.getElementById('sleepStartTimer').addEventListener('click', () => {
+    active.sleep = { start: Date.now() };
+    closeOverlay('sleepOverlay');
+    updateActionUI();
+    touch();
+  });
+  document.getElementById('sleepLogSave').addEventListener('click', () => {
+    const duration = sleepHourWheel.get() * 3600000 + sleepMinWheel.get() * 60000;
+    if (duration <= 0) { showErr('sleepErr', 'Pick a duration'); return; }
+    const end = Date.now();
+    const start = end - duration;
+    entries.push({ id: 's'+start, type: 'sleep', start, end, duration });
+    closeOverlay('sleepOverlay');
+    touch(); render();
+  });
 
   // Bottle
   const bottleMilk = choiceSetup('bottleMilkChoice', 'formula');
@@ -908,9 +1173,10 @@
   updateActionUI();
   render();
   setSyncNote(syncOk);
+  if (!room) openOverlay('loginOverlay');
   pull();
   setInterval(pull, POLL_MS);
-  setInterval(updateStats, 15000);
+  setInterval(() => { updateStats(); renderTimeline(); }, 15000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) pull(); });
   window.addEventListener('online', pull);
 </script>
