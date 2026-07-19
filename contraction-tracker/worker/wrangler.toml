@@ -1,5 +1,5 @@
 name = "contraction-sync"
-main = "worker/index.js"
+main = "index.js"
 compatibility_date = "2026-07-16"
 
 [[kv_namespaces]]
