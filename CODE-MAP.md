@@ -26,6 +26,8 @@ History note: the repo began as `contraction-timer` with the timer at the root; 
 - **`contraction-tracker/worker/index.js`** — Cloudflare Worker `contraction-sync` (KV binding `STATE`). GET/PUT `/state/:room`, CORS `*`, validates JSON + numeric `revision`.
 
 Gotchas:
+- GitHub Pages serves with `Cache-Control: max-age=600`: for up to ~10 min after a push, browsers (and the CDN) can serve the OLD page even though curl from another network sees the new one. Verified symptom: after a password-hash change, the correct new password gets "Wrong password" because the cached page still embeds the old hash — hard-refresh or wait, don't debug the app.
+- Changing the baby tracker password moves every device to a different sync room (room id is derived from the password), abandoning the old room's KV state — change it only when the log is empty, or migrate the KV value first.
 - KV is eventually consistent cross-colo (up to ~60s); same-household devices hit the same colo so sync is effectively instant. Don't "fix" apparent staleness when testing from different networks.
 - Conflict model is wholesale LWW — two devices mutating in the same poll window can clobber one tap. Accepted: one person logs in practice.
 - Worker PUTs can return CF edge error 1042 for ~1 min right after a fresh deploy — transient, retry.
