@@ -149,6 +149,21 @@
   .rowbtn:active { color: var(--text); }
   .empty { color: var(--subtle); font-size: 14px; padding: 8px 4px; }
 
+  /* log filter chips + collapsible day sections */
+  .logfilter { display: flex; gap: 5px; flex-wrap: wrap; margin: -2px 0 8px; }
+  .logfilter button {
+    padding: 5px 10px; font-size: 13px; border-radius: 8px; cursor: pointer; line-height: 1.2;
+    border: 1px solid var(--border); background: var(--card); color: var(--soft);
+  }
+  .logfilter button.sel { background: var(--accent); border-color: var(--accent2); color: #fff; font-weight: 600; }
+  .log li.dayhead {
+    display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+    cursor: pointer; user-select: none; -webkit-user-select: none;
+    color: var(--soft); font-size: 13px; font-weight: 600; padding: 10px 4px;
+  }
+  .log li.dayhead .arr { color: var(--subtle); font-size: 10px; margin-right: 6px; }
+  .log li.dayhead .daysum { color: var(--muted); font-weight: 400; font-size: 12px; text-align: right; }
+
   .overlay {
     position: fixed; inset: 0;
     background: rgba(0,0,0,0.55);
@@ -392,6 +407,17 @@
   <div class="tl" id="timeline"></div>
 
   <h2>Log</h2>
+  <div class="logfilter" id="logFilterRow">
+    <button data-t="" class="sel">All</button>
+    <button data-t="sleep" title="Sleep">😴</button>
+    <button data-t="nurse" title="Nurse">🤱</button>
+    <button data-t="bottle" title="Bottle">🍼</button>
+    <button data-t="pump" title="Pump">🥛</button>
+    <button data-t="diaper" title="Diaper">💧</button>
+    <button data-t="solid" title="Solids">🥄</button>
+    <button data-t="med" title="Medicine">💊</button>
+    <button data-t="health" title="Health">🌡️</button>
+  </div>
   <ul class="log" id="logList">
     <li class="empty">Nothing logged yet.</li>
   </ul>
@@ -1167,43 +1193,90 @@
     document.getElementById('timeline').innerHTML = html;
   }
 
-  let logLimit = 50;
+  // ---- log list: type filter chips + collapsible day sections (today always
+  // open; past days start as a one-line summary header). Both are view state
+  // only — in memory, so the sync poll's re-renders don't reset them. ----
+  let logLimit = 50;              // cap on rendered entry rows (day headers are free)
+  let logFilter = '';             // '' = all types
+  const expandedDays = new Set(); // toDateString() keys of past days the user opened
+
+  const logFilterRow = document.getElementById('logFilterRow');
+  logFilterRow.addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    logFilter = b.dataset.t;
+    logFilterRow.querySelectorAll('button').forEach(x => x.classList.toggle('sel', x === b));
+    logLimit = 50; // reset paging when the view changes
+    render();
+  });
+
+  function daySummary(list) {
+    if (logFilter) {
+      const ico = (TL_TYPES.find(t => t.type === logFilter) || {}).ico || '';
+      return `${list.length} × ${ico}`;
+    }
+    const feeds = list.filter(e => e.type === 'nurse' || e.type === 'bottle' || e.type === 'solid').length;
+    const diapers = list.filter(e => e.type === 'diaper').length;
+    const sleepMs = list.filter(e => e.type === 'sleep').reduce((n, e) => n + (e.duration || 0), 0);
+    const parts = [];
+    if (feeds) parts.push(`${feeds} feed${feeds === 1 ? '' : 's'}`);
+    if (diapers) parts.push(`${diapers} diaper${diapers === 1 ? '' : 's'}`);
+    if (sleepMs) parts.push(fmtShort(sleepMs));
+    return parts.join(' · ') || `${list.length} ${list.length === 1 ? 'entry' : 'entries'}`;
+  }
+
+  function entryLi(e) {
+    const by = e.by ? ` · ${e.by}` : '';
+    const li = document.createElement('li');
+    li.innerHTML = `<span class="ico">${entryIcon(e)}</span>
+                    <span class="main"><span class="type">${entryTypeLabel(e)}</span><span class="detail">${esc(entryDetail(e) + by)}</span></span>
+                    <span class="time">${fmtClock(e.start)}</span>
+                    <span class="rowacts">
+                      <button class="rowbtn" data-edit="${e.id}" aria-label="Edit">✎</button>
+                      <button class="rowbtn" data-del="${e.id}" aria-label="Delete">✕</button>
+                    </span>${e.note ? `<span class="note">${esc(e.note)}</span>` : ''}`;
+    return li;
+  }
+
   function render() {
     updateStats();
     renderTimeline();
     renderHistory();
     const sorted = entries.slice().sort((a,b) => b.start - a.start); // newest first
-    if (sorted.length === 0) {
-      logList.innerHTML = '<li class="empty">Nothing logged yet.</li>';
+    const filtered = logFilter ? sorted.filter(e => e.type === logFilter) : sorted;
+    if (filtered.length === 0) {
+      logList.innerHTML = `<li class="empty">${sorted.length === 0 ? 'Nothing logged yet.' : 'Nothing logged for this filter.'}</li>`;
       return;
     }
     logList.innerHTML = '';
     const dayFmt = new Intl.DateTimeFormat([], { weekday: 'short', day: 'numeric', month: 'short' });
-    let lastDay = null;
-    for (const e of sorted.slice(0, logLimit)) {
-      const day = new Date(e.start).toDateString();
-      if (day !== lastDay && day !== new Date().toDateString()) {
+    const todayKey = new Date().toDateString();
+    let budget = logLimit; // entry rows only; collapsed content isn't "more", it's one tap away
+    let cut = 0;
+    let i = 0;
+    while (i < filtered.length) {
+      const key = new Date(filtered[i].start).toDateString();
+      const day = [];
+      while (i < filtered.length && new Date(filtered[i].start).toDateString() === key) day.push(filtered[i++]);
+      const isToday = key === todayKey;
+      const open = isToday || expandedDays.has(key);
+      if (!isToday) {
         const h = document.createElement('li');
-        h.className = 'empty';
-        h.textContent = dayFmt.format(e.start);
+        h.className = 'dayhead';
+        h.dataset.day = key;
+        h.innerHTML = `<span><span class="arr">${open ? '▾' : '▸'}</span>${dayFmt.format(day[0].start)}</span><span class="daysum">${daySummary(day)}</span>`;
         logList.appendChild(h);
       }
-      lastDay = day;
-      const by = e.by ? ` · ${e.by}` : '';
-      const li = document.createElement('li');
-      li.innerHTML = `<span class="ico">${entryIcon(e)}</span>
-                      <span class="main"><span class="type">${entryTypeLabel(e)}</span><span class="detail">${esc(entryDetail(e) + by)}</span></span>
-                      <span class="time">${fmtClock(e.start)}</span>
-                      <span class="rowacts">
-                        <button class="rowbtn" data-edit="${e.id}" aria-label="Edit">✎</button>
-                        <button class="rowbtn" data-del="${e.id}" aria-label="Delete">✕</button>
-                      </span>${e.note ? `<span class="note">${esc(e.note)}</span>` : ''}`;
-      logList.appendChild(li);
+      if (open) for (const e of day) {
+        if (budget <= 0) { cut++; continue; }
+        budget--;
+        logList.appendChild(entryLi(e));
+      }
     }
-    if (sorted.length > logLimit) {
+    if (cut > 0) {
       const li = document.createElement('li');
       li.className = 'showmore';
-      li.innerHTML = `<button data-more="1">Show earlier (${sorted.length - logLimit} more)</button>`;
+      li.innerHTML = `<button data-more="1">Show earlier (${cut} more)</button>`;
       logList.appendChild(li);
     }
   }
@@ -1212,6 +1285,13 @@
   logList.addEventListener('click', (e) => {
     const more = e.target.closest('[data-more]');
     if (more) { logLimit += 100; render(); return; }
+    const dh = e.target.closest('.dayhead');
+    if (dh) {
+      const k = dh.dataset.day;
+      if (expandedDays.has(k)) expandedDays.delete(k); else expandedDays.add(k);
+      render();
+      return;
+    }
     const btn = e.target.closest('.rowbtn');
     if (!btn) return;
     if (btn.dataset.edit !== undefined) editRow(btn.dataset.edit);
