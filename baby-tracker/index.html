@@ -220,6 +220,21 @@
   /* login gate */
   #loginOverlay { background: var(--bg); z-index: 20; }
 
+  /* ringing alarm overlay */
+  #alarmOverlay { z-index: 30; background: rgba(120, 20, 20, 0.6); }
+  .alarmbox {
+    background: var(--card); border: 2px solid var(--go-text); border-radius: 20px;
+    padding: 28px 24px; width: 100%; max-width: 340px; text-align: center;
+    animation: alarmpulse 1s infinite;
+  }
+  @keyframes alarmpulse { 0%,100% { box-shadow: 0 0 0 0 rgba(255,90,60,0.5); } 50% { box-shadow: 0 0 0 14px rgba(255,90,60,0); } }
+  .alarmbox .alarmico { font-size: 44px; margin-bottom: 10px; }
+  .alarmbox #alarmMsgs { font-size: 17px; font-weight: 600; line-height: 1.5; margin-bottom: 20px; }
+  .alarmbox button {
+    width: 100%; padding: 15px; font-size: 16px; font-weight: 700; cursor: pointer;
+    border-radius: 12px; border: none; background: var(--go-text); color: #fff;
+  }
+
   /* alerts modal */
   .alertrow { display: flex; align-items: center; gap: 6px; padding: 7px 0; font-size: 13px; }
   .alertrow span { flex: 1; }
@@ -503,13 +518,14 @@
         </div>
       </div>
       <div class="field" style="margin-top:16px;">
-        <label>Remind us when (shared between devices)</label>
+        <label>Remind this device when</label>
         <div class="alertrow"><input type="checkbox" id="alFeedOn"><span>🍼 No feed for</span><select id="alFeedMin"></select><select id="alFeedCrit" title="How loud"></select></div>
         <div class="alertrow"><input type="checkbox" id="alDiaperOn"><span><svg class="svgico"><use href="#icoDiaper"/></svg> No diaper for</span><select id="alDiaperMin"></select><select id="alDiaperCrit" title="How loud"></select></div>
         <div class="alertrow"><input type="checkbox" id="alAwakeOn"><span>☀️ Awake for</span><select id="alAwakeMin"></select><select id="alAwakeCrit" title="How loud"></select></div>
         <div class="alertrow"><input type="checkbox" id="alSleepOn"><span>😴 Asleep for</span><select id="alSleepMin"></select><select id="alSleepCrit" title="How loud"></select></div>
         <div class="alertrow"><input type="checkbox" id="alQuietOn"><span>🌙 Quiet hours</span><select id="alQuietFrom"></select><select id="alQuietTo"></select></div>
-        <div class="pushstatus" style="margin-top:6px;">Quiet = silent, once. Normal = sound, repeats every 30 min. Nag = sound, repeats every 10 min until logged. During quiet hours nothing is sent; pending alerts arrive when they end.</div>
+        <div class="pushstatus" style="margin-top:6px;">Quiet = silent, once. Normal = sound, repeats every 30 min. Nag = sound, repeats every 10 min until logged. Alarm = rings out loud like a timer on any device showing the app, plus the strongest push every 5 min. During quiet hours nothing is sent; pending alerts arrive when they end. If pushes stop arriving with the app closed, turn off battery optimization for your browser/app in Android settings.</div>
+        <div class="pushstatus" id="srvStatus" style="margin-top:6px;"></div>
       </div>
       <div class="btns">
         <button id="alertsClose">Close</button>
@@ -741,6 +757,15 @@
         <button id="healthCancel">Cancel</button>
         <button class="primary" id="healthSave">Save</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Ringing alarm (crit "alarm" rules, on devices with the app open) -->
+  <div class="overlay" id="alarmOverlay">
+    <div class="alarmbox">
+      <div class="alarmico">⏰</div>
+      <div id="alarmMsgs"></div>
+      <button id="alarmStop">Stop</button>
     </div>
   </div>
 
@@ -1369,6 +1394,7 @@
     updateStats();
     renderTimeline();
     renderHistory();
+    if (alertPrefs) evalLocalAlarms(); // logging an activity silences a ringing alarm immediately
     const sorted = entries.slice().sort((a,b) => b.start - a.start); // newest first
     const filtered = logFilter ? sorted.filter(e => e.type === logFilter) : sorted;
     if (filtered.length === 0) {
@@ -1925,8 +1951,25 @@
   });
 
   // ---- alerts & push notifications ----
-  // Rules are shared state (synced, evaluated server-side by the worker cron);
-  // the push subscription is per-device.
+  // Rules are PER DEVICE: stored locally (btAlertPrefs_v1) and attached to this
+  // device's push subscription, where the worker cron evaluates them per device.
+  // They are also mirrored into the legacy shared `alerts` sync field so a
+  // not-yet-updated worker keeps sending until it's redeployed.
+  const PREFS_KEY = 'btAlertPrefs_v1';
+  let alertPrefs = null; // initialized after load() so first run can seed from the old shared config
+  function normPrefs(p) {
+    const d = defaultAlerts();
+    if (p) for (const k of Object.keys(d)) if (p[k]) d[k] = { ...d[k], ...p[k] };
+    return d;
+  }
+  function savePrefs() {
+    try { localStorage.setItem(PREFS_KEY, JSON.stringify(alertPrefs)); } catch(e) {}
+    alerts = JSON.parse(JSON.stringify(alertPrefs)); // legacy dual-write (see above)
+    bumpAlerts();
+    let pushOn = false;
+    try { pushOn = !!localStorage.getItem(PUSH_FLAG); } catch(e) {}
+    if (pushOn && pushSupported() && Notification.permission === 'granted') subscribePush().catch(() => {});
+  }
   const RULES = [
     { key: 'feed',   on: 'alFeedOn',   min: 'alFeedMin',   crit: 'alFeedCrit' },
     { key: 'diaper', on: 'alDiaperOn', min: 'alDiaperMin', crit: 'alDiaperCrit' },
@@ -1934,7 +1977,7 @@
     { key: 'sleep',  on: 'alSleepOn',  min: 'alSleepMin',  crit: 'alSleepCrit' },
   ];
   const DUR_OPTS = [30, 45, 60, 90, 120, 150, 180, 210, 240, 300, 360, 480, 720];
-  const CRIT_OPTS = [['low', 'Quiet'], ['normal', 'Normal'], ['high', 'Nag']];
+  const CRIT_OPTS = [['low', 'Quiet'], ['normal', 'Normal'], ['high', 'Nag'], ['alarm', 'Alarm']];
   function durLabel(min) {
     const h = Math.floor(min / 60), m = min % 60;
     return h > 0 ? (m ? `${h}h ${m}m` : `${h}h`) : `${m}m`;
@@ -1942,39 +1985,137 @@
   for (const r of RULES) {
     const sel = document.getElementById(r.min);
     sel.innerHTML = DUR_OPTS.map(v => `<option value="${v}">${durLabel(v)}</option>`).join('');
-    sel.addEventListener('change', () => { alerts[r.key].min = +sel.value; bumpAlerts(); });
+    sel.addEventListener('change', () => { alertPrefs[r.key].min = +sel.value; savePrefs(); });
     const crit = document.getElementById(r.crit);
     crit.innerHTML = CRIT_OPTS.map(([v, l]) => `<option value="${v}">${l}</option>`).join('');
-    crit.addEventListener('change', () => { alerts[r.key].crit = crit.value; bumpAlerts(); });
-    document.getElementById(r.on).addEventListener('change', (e) => { alerts[r.key].on = e.target.checked; bumpAlerts(); });
+    crit.addEventListener('change', () => { alertPrefs[r.key].crit = crit.value; savePrefs(); });
+    document.getElementById(r.on).addEventListener('change', (e) => { alertPrefs[r.key].on = e.target.checked; savePrefs(); });
   }
 
-  // quiet hours: shared window during which the worker sends nothing
+  // quiet hours: per-device window during which nothing is sent to this device
   const HOUR_OPTS = Array.from({ length: 24 }, (_, h) => `${String(h).padStart(2, '0')}:00`);
   function quietCfg() {
-    if (!alerts.quiet) alerts.quiet = defaultAlerts().quiet;
-    return alerts.quiet;
+    if (!alertPrefs.quiet) alertPrefs.quiet = defaultAlerts().quiet;
+    return alertPrefs.quiet;
   }
   for (const id of ['alQuietFrom', 'alQuietTo'])
     document.getElementById(id).innerHTML = HOUR_OPTS.map(h => `<option>${h}</option>`).join('');
   document.getElementById('alQuietOn').addEventListener('change', (e) => {
     const q = quietCfg(); q.on = e.target.checked;
     q.tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    bumpAlerts();
+    savePrefs();
   });
-  document.getElementById('alQuietFrom').addEventListener('change', (e) => { quietCfg().from = e.target.value; bumpAlerts(); });
-  document.getElementById('alQuietTo').addEventListener('change', (e) => { quietCfg().to = e.target.value; bumpAlerts(); });
+  document.getElementById('alQuietFrom').addEventListener('change', (e) => { quietCfg().from = e.target.value; savePrefs(); });
+  document.getElementById('alQuietTo').addEventListener('change', (e) => { quietCfg().to = e.target.value; savePrefs(); });
 
   function paintAlertRules() {
+    if (!alertPrefs) return;
     for (const r of RULES) {
-      document.getElementById(r.on).checked = !!alerts[r.key].on;
-      document.getElementById(r.min).value = String(alerts[r.key].min);
-      document.getElementById(r.crit).value = alerts[r.key].crit || 'normal';
+      document.getElementById(r.on).checked = !!alertPrefs[r.key].on;
+      document.getElementById(r.min).value = String(alertPrefs[r.key].min);
+      document.getElementById(r.crit).value = alertPrefs[r.key].crit || 'normal';
     }
     const q = quietCfg();
     document.getElementById('alQuietOn').checked = !!q.on;
     document.getElementById('alQuietFrom').value = q.from;
     document.getElementById('alQuietTo').value = q.to;
+  }
+
+  // ---- ringing alarm: rules set to crit 'alarm' ring like a timer on any
+  // device where the app is open (looping tone + full-screen stop overlay).
+  // Push still goes out server-side for closed devices. ----
+  const ALARM_SNOOZE_MS = 15 * 60000; // Stop silences; re-rings if still not logged
+  let audioCtx = null;
+  document.addEventListener('pointerdown', () => { // browsers require a gesture before audio
+    if (!audioCtx) { try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) {} }
+    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+  });
+  function alarmBeep() {
+    if (!audioCtx || audioCtx.state !== 'running') return;
+    try {
+      const t = audioCtx.currentTime;
+      for (const [f, at] of [[880, 0], [660, 0.22]]) {
+        const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+        o.frequency.value = f; o.type = 'square';
+        g.gain.setValueAtTime(0.0001, t + at);
+        g.gain.exponentialRampToValueAtTime(0.4, t + at + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + at + 0.18);
+        o.connect(g); g.connect(audioCtx.destination);
+        o.start(t + at); o.stop(t + at + 0.2);
+      }
+    } catch(e) {}
+  }
+  let alarmRinging = false, alarmBeeper = null;
+  const alarmSnooze = {}; // rule key -> snoozed-until ts
+  function localQuiet(now) { // same window logic as the worker
+    const q = alertPrefs && alertPrefs.quiet;
+    if (!q || !q.on) return false;
+    let cur;
+    try { cur = new Date(now).toLocaleTimeString('en-GB', { timeZone: q.tz || 'UTC', hour12: false, hour: '2-digit', minute: '2-digit' }); } catch(e) { return false; }
+    return q.from <= q.to ? cur >= q.from && cur < q.to : cur >= q.from || cur < q.to;
+  }
+  function dueAlarmRules(now) {
+    if (!alertPrefs) return [];
+    const a = alertPrefs;
+    const over = (t, r) => r && r.on && r.crit === 'alarm' && t !== null && now - t > r.min * 60000;
+    const due = [];
+    if (!active.nurse) { const t = latestFeedTime(); if (over(t, a.feed)) due.push({ key: 'feed', body: `🍼 No feed for ${fmtShort(now - t)}` }); }
+    { const t = latestDiaperTime(); if (over(t, a.diaper)) due.push({ key: 'diaper', body: `No diaper change for ${fmtShort(now - t)}` }); }
+    if (!active.sleep) { const t = lastOfType('sleep'); if (over(t, a.awake)) due.push({ key: 'awake', body: `☀️ Awake for ${fmtShort(now - t)}` }); }
+    if (active.sleep) { const t = active.sleep.start; if (over(t, a.sleep)) due.push({ key: 'sleep', body: `😴 Asleep for ${fmtShort(now - t)}` }); }
+    return due;
+  }
+  function evalLocalAlarms() {
+    const now = Date.now();
+    const due = dueAlarmRules(now);
+    for (const k of Object.keys(alarmSnooze)) if (!due.some(d => d.key === k)) delete alarmSnooze[k]; // cleared -> next crossing rings fresh
+    const ringing = localQuiet(now) ? [] : due.filter(d => !(alarmSnooze[d.key] > now));
+    if (ringing.length) {
+      document.getElementById('alarmMsgs').innerHTML = ringing.map(d => esc(d.body)).join('<br>');
+      if (!alarmRinging) {
+        alarmRinging = true;
+        openOverlay('alarmOverlay');
+        const buzz = () => { alarmBeep(); if (navigator.vibrate) try { navigator.vibrate([400, 150, 400]); } catch(e) {} };
+        buzz();
+        alarmBeeper = setInterval(buzz, 1500);
+      }
+    } else if (alarmRinging) {
+      stopAlarm(false);
+    }
+  }
+  function stopAlarm(snooze) {
+    if (snooze) { const until = Date.now() + ALARM_SNOOZE_MS; for (const d of dueAlarmRules(Date.now())) alarmSnooze[d.key] = until; }
+    alarmRinging = false;
+    if (alarmBeeper) { clearInterval(alarmBeeper); alarmBeeper = null; }
+    closeOverlay('alarmOverlay');
+  }
+  document.getElementById('alarmStop').addEventListener('click', () => stopAlarm(true));
+  document.getElementById('alarmOverlay').addEventListener('click', (e) => { if (e.target.id === 'alarmOverlay') stopAlarm(true); });
+
+  // server-side visibility: when did the cron last run, is this device registered?
+  async function updateSrvStatus() {
+    const el = document.getElementById('srvStatus');
+    el.textContent = '';
+    if (!room) return;
+    try {
+      let endpoint = null;
+      if (pushSupported()) {
+        // getRegistration() resolves even when no SW is registered; .ready would hang forever
+        try { const reg = await navigator.serviceWorker.getRegistration(); endpoint = (reg && (await reg.pushManager.getSubscription())?.endpoint) || null; } catch(e) {}
+      }
+      const r = await fetch(`${SYNC_URL}/status/${room}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ endpoint }), signal: AbortSignal.timeout(8000) });
+      if (!r.ok) throw 0;
+      const d = await r.json();
+      const cron = d.lastCron ? fmtShort(Date.now() - d.lastCron) + ' ago' : 'never';
+      let msg = `Server alert check: ${cron} · ${d.devices} device${d.devices === 1 ? '' : 's'} registered`;
+      if (endpoint) msg += d.subscribed ? ' · this device ✓' : ' · ⚠ this device is NOT registered — toggle notifications off and on';
+      const healthy = d.lastCron && Date.now() - d.lastCron < 45 * 60000 && (!endpoint || d.subscribed);
+      el.className = 'pushstatus' + (healthy ? ' ok' : ' warn');
+      el.textContent = msg;
+    } catch(e) {
+      el.className = 'pushstatus warn';
+      el.textContent = 'Server status unavailable — sync worker may be old or unreachable.';
+    }
   }
 
   // per-device name stamped onto entries this device logs
@@ -2026,7 +2167,8 @@
     const r = await fetch(`${SYNC_URL}/subscribe/${room}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(sub.toJSON()),
+      // this device's alert prefs ride along so the worker evaluates them per device
+      body: JSON.stringify({ ...sub.toJSON(), alerts: alertPrefs || undefined }),
     });
     if (!r.ok) throw new Error('subscribe failed');
   }
@@ -2082,6 +2224,7 @@
     deviceNameInput.value = deviceName;
     paintAlertRules();
     updatePushUI();
+    updateSrvStatus();
     openOverlay('alertsOverlay');
   });
   document.getElementById('alertsClose').addEventListener('click', () => closeOverlay('alertsOverlay'));
@@ -2089,6 +2232,12 @@
 
   // ---- init: restore state, then sync ----
   load();
+  alertPrefs = (function(){ // per-device rules; first run seeds from the old shared config
+    try { const raw = localStorage.getItem(PREFS_KEY); if (raw) return normPrefs(JSON.parse(raw)); } catch(e) {}
+    const seeded = normPrefs(alerts);
+    try { localStorage.setItem(PREFS_KEY, JSON.stringify(seeded)); } catch(e) {}
+    return seeded;
+  })();
   updateActionUI();
   render();
   setSyncNote(syncOk);
@@ -2096,7 +2245,8 @@
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').then(ensurePush).catch(() => {});
   pull();
   setInterval(pull, POLL_MS);
-  setInterval(() => { updateStats(); renderTimeline(); }, 15000);
+  setInterval(() => { updateStats(); renderTimeline(); evalLocalAlarms(); }, 15000);
+  evalLocalAlarms();
   document.addEventListener('visibilitychange', () => { if (!document.hidden) pull(); });
   window.addEventListener('online', pull);
 </script>

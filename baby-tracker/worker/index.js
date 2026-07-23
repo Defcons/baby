@@ -2,14 +2,20 @@
 // plus web push subscriptions and a cron that evaluates alert rules.
 // GET  /state/:room           -> stored JSON or null
 // PUT  /state/:room           -> store JSON body (clients merge; last PUT wins per blob)
-// POST /subscribe/:room       -> store a push subscription for this room
+// POST /subscribe/:room       -> store a push subscription (+ that device's alert prefs)
 // POST /unsubscribe/:room     -> remove a push subscription ({endpoint})
 // POST /test/:room            -> send a test notification to all of the room's devices
+// POST /status/:room          -> { lastCron, devices, subscribed } diagnostics ({endpoint} optional)
 // GET  /archive/:room         -> { months: ["2026-07", ...] }
 // GET  /archive/:room/:month  -> archived entries for that month
-// KV: room:<id> = hot state, sub:<id>:<hash> = subscription,
-//     alerted:<id> = {rule: lastFiredTs}, archive:<id>:<YYYY-MM> = old entries,
-//     backup:<id>:<YYYY-MM-DD> = daily snapshots (14 kept), maint:last = date gate
+// KV: room:<id> = hot state, sub:<id>:<hash> = {endpoint, keys, alerts?},
+//     alerted:<id> = {"<hash>:<rule>": lastFiredTs}, archive:<id>:<YYYY-MM> = old entries,
+//     backup:<id>:<YYYY-MM-DD> = daily snapshots (14 kept), maint:last = date gate,
+//     cron:last = last alert-check ts (written at most every 30 min to spare the KV write quota)
+//
+// Alert rules are PER DEVICE: each subscription carries its own `alerts` config
+// (uploaded by the client); a sub without one falls back to the room state's
+// legacy shared `alerts` so old clients keep working.
 
 import { sendPush } from './webpush.js';
 
@@ -20,8 +26,8 @@ const CORS = {
 };
 const SUBJECT = 'mailto:davidsen908@gmail.com';
 // Re-alert cadence per rule criticality while a condition keeps holding.
-// null = fire once per crossing, no repeats.
-const REPEAT_MS = { low: null, normal: 30 * 60000, high: 10 * 60000 };
+// null = fire once per crossing, no repeats. 'alarm' repeats on every cron run.
+const REPEAT_MS = { low: null, normal: 30 * 60000, high: 10 * 60000, alarm: 4.5 * 60000 };
 
 const json = (obj, status = 200) =>
   new Response(JSON.stringify(obj), { status, headers: { ...CORS, 'Content-Type': 'application/json' } });
@@ -105,8 +111,9 @@ export function dueAlerts(state, now) {
   return due;
 }
 
-async function checkAlerts(env) {
+export async function checkAlerts(env) { // exported for tests
   const now = Date.now();
+  const jwk = JSON.parse(env.VAPID_JWK);
   const list = await env.STATE.list({ prefix: 'sub:' });
   const rooms = new Set(list.keys.map((k) => k.name.split(':')[1]));
   for (const room of rooms) {
@@ -114,26 +121,43 @@ async function checkAlerts(env) {
     if (!raw) continue;
     let state;
     try { state = JSON.parse(raw); } catch { continue; }
-    const due = dueAlerts(state, now);
+    // evaluate each device's own rules (fallback: the legacy shared config)
+    const devices = [];
+    for (const { key, sub } of await roomSubs(env, room)) {
+      const cfg = sub.alerts || state.alerts || {};
+      devices.push({ id: key.split(':')[2], key, sub, cfg, due: dueAlerts({ ...state, alerts: cfg }, now) });
+    }
     const alertedKey = 'alerted:' + room;
     let alerted = {};
     try { alerted = JSON.parse((await env.STATE.get(alertedKey)) || '{}'); } catch {}
     let changed = false;
-    const dueKeys = new Set(due.map((d) => d.key));
+    const dueKeys = new Set(); // "<deviceId>:<rule>" entries currently due
+    for (const dev of devices) for (const d of dev.due) dueKeys.add(`${dev.id}:${d.key}`);
     for (const k of Object.keys(alerted)) {
       if (!dueKeys.has(k)) { delete alerted[k]; changed = true; } // condition reset -> next crossing alerts immediately
     }
-    if (!inQuietHours(state.alerts, new Date(now))) {
-      for (const d of due) {
+    for (const dev of devices) {
+      if (inQuietHours(dev.cfg, new Date(now))) continue; // per-device quiet hours
+      for (const d of dev.due) {
+        const ak = `${dev.id}:${d.key}`;
         const repeat = REPEAT_MS[d.crit] ?? REPEAT_MS.normal;
-        if (alerted[d.key] && (repeat === null || now - alerted[d.key] < repeat)) continue;
-        await pushRoom(env, room, { title: 'Baby Tracker', body: d.body, tag: 'bt-' + d.key, crit: d.crit });
-        alerted[d.key] = now;
+        if (alerted[ak] && (repeat === null || now - alerted[ak] < repeat)) continue;
+        let status;
+        try {
+          status = await sendPush(dev.sub, { title: 'Baby Tracker', body: d.body, tag: 'bt-' + d.key, crit: d.crit }, jwk, SUBJECT, { urgency: d.crit === 'low' ? 'normal' : 'high' });
+        } catch { status = 0; }
+        if (status === 404 || status === 410) await env.STATE.delete(dev.key);
+        alerted[ak] = now;
         changed = true;
       }
     }
     if (changed) await env.STATE.put(alertedKey, JSON.stringify(alerted));
   }
+  // heartbeat for the in-app status line; throttled to respect the KV write quota
+  try {
+    const last = +(await env.STATE.get('cron:last')) || 0;
+    if (now - last > 30 * 60000) await env.STATE.put('cron:last', String(now));
+  } catch {}
 }
 
 // Daily (gated by maint:last) per-room housekeeping:
@@ -188,7 +212,7 @@ export default {
     if (req.method === 'OPTIONS') return new Response(null, { headers: CORS });
 
     const url = new URL(req.url);
-    const m = url.pathname.match(/^\/(state|subscribe|unsubscribe|test|archive)\/([a-z0-9-]{8,64})(?:\/(\d{4}-\d{2}))?$/i);
+    const m = url.pathname.match(/^\/(state|subscribe|unsubscribe|test|status|archive)\/([a-z0-9-]{8,64})(?:\/(\d{4}-\d{2}))?$/i);
     if (!m) return new Response('not found', { status: 404, headers: CORS });
     const [, action, roomRaw, month] = m;
     const room = roomRaw.toLowerCase();
@@ -235,7 +259,10 @@ export default {
         return new Response('bad subscription', { status: 400, headers: CORS });
       }
       const id = await endpointHash(sub.endpoint);
-      await env.STATE.put(`sub:${room}:${id}`, JSON.stringify({ endpoint: sub.endpoint, keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth } }));
+      const rec = { endpoint: sub.endpoint, keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth } };
+      // per-device alert prefs ride along with the subscription
+      if (sub.alerts && typeof sub.alerts === 'object' && JSON.stringify(sub.alerts).length <= 4096) rec.alerts = sub.alerts;
+      await env.STATE.put(`sub:${room}:${id}`, JSON.stringify(rec));
       return new Response('ok', { headers: CORS });
     }
 
@@ -246,6 +273,19 @@ export default {
       }
       await env.STATE.delete(`sub:${room}:${await endpointHash(endpoint)}`);
       return new Response('ok', { headers: CORS });
+    }
+
+    if (action === 'status' && req.method === 'POST') {
+      let endpoint = null;
+      try { endpoint = JSON.parse(await req.text()).endpoint || null; } catch {}
+      const subs = (await env.STATE.list({ prefix: `sub:${room}:` })).keys;
+      let subscribed = false;
+      if (typeof endpoint === 'string') {
+        const id = await endpointHash(endpoint);
+        subscribed = subs.some((k) => k.name.endsWith(':' + id));
+      }
+      const lastCron = +(await env.STATE.get('cron:last')) || null;
+      return json({ lastCron, devices: subs.length, subscribed });
     }
 
     if (action === 'test' && req.method === 'POST') {
