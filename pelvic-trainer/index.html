@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pelvic Trainer</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#14110f">
+<meta name="application-name" content="Pelvic Trainer">
+<meta name="apple-mobile-web-app-title" content="Pelvic Trainer">
+<style>
+  :root {
+    --bg: #14110f;
+    --card: #1e1a17;
+    --border: #2c2621;
+    --border2: #241f1b;
+    --text: #f0ece6;
+    --muted: #8a827a;
+    --subtle: #6b635b;
+    --soft: #c9c1b8;
+    --accent: #b76e94;
+    --accent2: #96547a;
+    --ok: #6f9a6f;
+    --warn: #b08a4f;
+    --go-text: #ff9d8a;
+  }
+  html[data-theme="light"] {
+    --bg: #f8f5f7;
+    --card: #ffffff;
+    --border: #ecdde6;
+    --border2: #f2e8ee;
+    --text: #322b30;
+    --muted: #94818c;
+    --subtle: #b8a5b0;
+    --soft: #5f4d58;
+    --accent: #b05f8a;
+    --accent2: #8f4a6e;
+    --ok: #4c7d4c;
+    --warn: #9a7433;
+    --go-text: #a03a26;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 20px 16px 40px;
+    max-width: 560px;
+    margin: 0 auto;
+    transition: background 0.25s, color 0.25s;
+  }
+  .top { display: flex; align-items: flex-start; justify-content: space-between; }
+  h1 { font-size: 20px; font-weight: 600; margin-bottom: 4px; letter-spacing: -0.01em; }
+  .sub { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+  .topbtns { display: flex; gap: 8px; }
+  .themebtn, .navlink {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-size: 16px;
+    padding: 7px 10px;
+    cursor: pointer;
+    line-height: 1;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    color: var(--text);
+  }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 10px; margin-top: 22px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 14px; }
+
+  /* today + streak */
+  .todayrow { display: flex; align-items: center; justify-content: space-between; }
+  .todaydots { display: flex; gap: 8px; }
+  .tdot { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--border); }
+  .tdot.done { background: var(--accent); border-color: var(--accent2); }
+  .streak { font-size: 13px; color: var(--soft); }
+  .streak b { color: var(--text); }
+  .lvlhint { font-size: 12px; color: var(--ok); margin-top: 8px; display: none; }
+
+  /* start + presets */
+  .startbtn {
+    width: 100%; margin-top: 14px; padding: 20px; font-size: 18px; font-weight: 700;
+    border-radius: 16px; border: 1px solid var(--accent2); background: var(--accent); color: #fff; cursor: pointer;
+    transition: transform 0.08s;
+  }
+  .startbtn:active { transform: scale(0.98); }
+  .startbtn .est { display: block; font-size: 12px; font-weight: 400; opacity: 0.85; margin-top: 3px; }
+  .presets { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .presets button {
+    padding: 12px 8px; border-radius: 12px; cursor: pointer; text-align: left;
+    border: 1px solid var(--border); background: var(--card); color: var(--soft); font-size: 13px; font-weight: 600;
+  }
+  .presets button .d { display: block; font-size: 11px; font-weight: 400; color: var(--muted); margin-top: 2px; }
+  .presets button.sel { border-color: var(--accent); background: var(--card); color: var(--text); box-shadow: inset 0 0 0 1px var(--accent); }
+  .customfields { display: none; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px; }
+  .customfields.open { display: grid; }
+  .customfields label { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin-bottom: 4px; }
+  .customfields input {
+    width: 100%; padding: 9px 6px; font-size: 15px; text-align: center;
+    border-radius: 9px; border: 1px solid var(--border); background: var(--bg); color: var(--text);
+  }
+
+  /* calendar */
+  .cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+  .cal .dh { font-size: 9px; text-transform: uppercase; color: var(--subtle); text-align: center; }
+  .cal .day {
+    aspect-ratio: 1; border-radius: 8px; background: var(--bg); border: 1px solid var(--border2);
+    display: flex; align-items: center; justify-content: center; font-size: 10px; color: var(--subtle);
+    position: relative;
+  }
+  .cal .day.s1 { background: color-mix(in srgb, var(--accent) 25%, var(--bg)); color: var(--soft); }
+  .cal .day.s2 { background: color-mix(in srgb, var(--accent) 55%, var(--bg)); color: #fff; }
+  .cal .day.s3 { background: var(--accent); color: #fff; font-weight: 700; }
+  .cal .day.today { outline: 2px solid var(--accent2); }
+  .cal .day.future { opacity: 0.3; }
+
+  /* reminders */
+  .remrow { display: flex; align-items: center; gap: 10px; padding: 7px 0; font-size: 14px; }
+  .remrow input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent); }
+  .remrow input[type="time"] {
+    padding: 8px 10px; font-size: 15px; border-radius: 9px;
+    border: 1px solid var(--border); background: var(--bg); color: var(--text);
+  }
+  .remrow span { flex: 1; color: var(--soft); }
+  .pushstatus { font-size: 12px; color: var(--muted); line-height: 1.5; margin-top: 8px; }
+  .pushstatus.ok { color: var(--ok); }
+  .pushstatus.warn { color: var(--warn); }
+  .btns { display: flex; gap: 10px; margin-top: 12px; }
+  .btns button {
+    flex: 1; padding: 12px; font-size: 14px; cursor: pointer;
+    border-radius: 10px; border: 1px solid var(--border); background: var(--card); color: var(--soft);
+  }
+  .btns button.primary { background: var(--accent); border-color: transparent; color: #fff; font-weight: 600; }
+
+  /* technique */
+  .tech { font-size: 14px; line-height: 1.65; color: var(--soft); }
+  .tech h3 { font-size: 13px; color: var(--text); margin: 14px 0 4px; }
+  .tech h3:first-child { margin-top: 0; }
+  .tech ul { padding-left: 18px; }
+  .tech li { margin-bottom: 4px; }
+  .tech .flag { color: var(--warn); }
+  .disclaimer { font-size: 11px; color: var(--subtle); margin-top: 16px; line-height: 1.5; }
+
+  /* session player */
+  .overlay {
+    position: fixed; inset: 0;
+    background: var(--bg);
+    display: none;
+    align-items: center; justify-content: center;
+    z-index: 10; padding: 16px;
+  }
+  .overlay.open { display: flex; }
+  .session { text-align: center; width: 100%; max-width: 380px; }
+  .sesscount { font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; min-height: 18px; }
+  .circlewrap { height: 300px; display: flex; align-items: center; justify-content: center; }
+  .circle {
+    width: 170px; height: 170px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--accent) 70%, #fff), var(--accent) 65%, var(--accent2));
+    display: flex; align-items: center; justify-content: center;
+    transform: scale(0.8);
+    box-shadow: 0 0 60px color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+  .circle span { font-size: 56px; font-weight: 700; color: #fff; font-variant-numeric: tabular-nums; }
+  .phaselabel { font-size: 24px; font-weight: 700; min-height: 32px; }
+  .phasesub { font-size: 13px; color: var(--muted); margin-top: 6px; min-height: 18px; }
+  .sessbtns { display: flex; gap: 10px; margin-top: 26px; }
+  .sessbtns button {
+    flex: 1; padding: 13px; font-size: 14px; cursor: pointer;
+    border-radius: 10px; border: 1px solid var(--border); background: var(--card); color: var(--soft);
+  }
+  .donebig { font-size: 52px; margin-bottom: 8px; }
+</style>
+<script>document.documentElement.dataset.theme = (function(){ try { return localStorage.getItem('pfTheme') || 'dark'; } catch(e) { return 'dark'; } })();</script>
+</head>
+<body>
+  <div class="top">
+    <div>
+      <h1>Pelvic Trainer</h1>
+    </div>
+    <div class="topbtns">
+      <a class="navlink" href="../baby-tracker/" title="Baby tracker">🍼</a>
+      <a class="navlink" href="../contraction-tracker/" title="Contraction timer">⏱️</a>
+      <button class="themebtn" id="themeBtn" aria-label="Toggle light/dark">☀️</button>
+    </div>
+  </div>
+  <div class="sub">Pelvic floor training — a few minutes, three times a day.</div>
+
+  <div class="card todayrow">
+    <div>
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);margin-bottom:6px;">Today</div>
+      <div class="todaydots" id="todayDots"><span class="tdot"></span><span class="tdot"></span><span class="tdot"></span></div>
+    </div>
+    <div class="streak" id="streakLabel">—</div>
+  </div>
+  <div class="lvlhint" id="lvlHint">🌱 Five consistent days — consider moving up a level.</div>
+
+  <button class="startbtn" id="startBtn">Start session<span class="est" id="estLabel"></span></button>
+
+  <h2>Plan</h2>
+  <div class="presets" id="presets">
+    <button data-p="gentle">Gentle start<span class="d">3s hold ×8 — first weeks</span></button>
+    <button data-p="building">Building<span class="d">6s hold ×10 + 5 quick</span></button>
+    <button data-p="full">Full plan<span class="d">10s hold ×10 + 10 quick</span></button>
+    <button data-p="custom">Custom<span class="d" id="customDesc">your own timings</span></button>
+  </div>
+  <div class="customfields" id="customFields">
+    <div><label for="cfHold">Hold s</label><input type="number" id="cfHold" min="1" max="15" inputmode="numeric"></div>
+    <div><label for="cfRest">Rest s</label><input type="number" id="cfRest" min="2" max="20" inputmode="numeric"></div>
+    <div><label for="cfReps">Holds</label><input type="number" id="cfReps" min="3" max="20" inputmode="numeric"></div>
+    <div><label for="cfQuicks">Quick</label><input type="number" id="cfQuicks" min="0" max="20" inputmode="numeric"></div>
+  </div>
+
+  <h2>Last weeks</h2>
+  <div class="card"><div class="cal" id="calendar"></div></div>
+
+  <h2>Reminders</h2>
+  <div class="card">
+    <div class="remrow"><input type="checkbox" id="rem1On"><input type="time" id="rem1T" value="09:00"><span>morning</span></div>
+    <div class="remrow"><input type="checkbox" id="rem2On"><input type="time" id="rem2T" value="13:30"><span>afternoon</span></div>
+    <div class="remrow"><input type="checkbox" id="rem3On"><input type="time" id="rem3T" value="20:30"><span>evening</span></div>
+    <div class="pushstatus" id="pushStatus">Checking…</div>
+    <div class="btns">
+      <button class="primary" id="pushToggle">Enable notifications</button>
+      <button id="pushTest" style="display:none;">Send test</button>
+    </div>
+  </div>
+
+  <h2>Technique</h2>
+  <div class="card tech">
+    <h3>Find the right muscles</h3>
+    <ul>
+      <li>Imagine gently stopping wind and urine at the same time — a "squeeze and lift" inside, up and forward.</li>
+      <li>Nothing should visibly move: no clenching buttocks, thighs or stomach.</li>
+      <li>Only use stopping urine mid-flow to <i>identify</i> the muscles once — never as the exercise itself.</li>
+    </ul>
+    <h3>While exercising</h3>
+    <ul>
+      <li>Breathe normally the whole time — counting out loud helps.</li>
+      <li>Relaxing fully between holds matters as much as the squeeze.</li>
+      <li>Start lying down; progress to sitting, then standing as it gets easier.</li>
+    </ul>
+    <h3>After birth</h3>
+    <ul>
+      <li>Vaginal birth: start as soon as it feels comfortable — even within days. Never with a catheter in, and stop if it hurts.</li>
+      <li>C-section: wait for your check-up clearance (usually ~6 weeks).</li>
+      <li>Expect ~3 months of consistent training before a real difference — keep going.</li>
+    </ul>
+    <h3>The Knack</h3>
+    <ul>
+      <li>Squeeze <i>just before</i> you cough, sneeze, laugh or lift — it becomes a reflex that stops leaks.</li>
+    </ul>
+    <h3 class="flag">See a pelvic physiotherapist if</h3>
+    <ul>
+      <li class="flag">Exercises hurt, leaking continues past ~12 weeks, or you feel heaviness / bulging in the vagina.</li>
+    </ul>
+    <div class="disclaimer">This app is a training timer, not medical advice. Based on NHS / NICE-aligned pelvic floor muscle training guidance (10s holds ×10 + 10 quick squeezes, 3 sessions daily, built up gradually).</div>
+  </div>
+
+  <!-- session player -->
+  <div class="overlay" id="sessionOverlay">
+    <div class="session" id="sessRun">
+      <div class="sesscount" id="sessProgress"></div>
+      <div class="circlewrap"><div class="circle" id="sessCircle"><span id="sessCountdown"></span></div></div>
+      <div class="phaselabel" id="sessPhase">Get ready</div>
+      <div class="phasesub" id="sessSub"></div>
+      <div class="sessbtns">
+        <button id="sessPause">Pause</button>
+        <button id="sessStop">End</button>
+      </div>
+    </div>
+    <div class="session" id="sessDone" style="display:none;">
+      <div class="donebig">✓</div>
+      <div class="phaselabel">Session done</div>
+      <div class="phasesub" id="doneSub"></div>
+      <div class="sessbtns"><button id="doneClose">Close</button></div>
+    </div>
+  </div>
+
+<script>
+  const REMINDER_URL = 'https://pelvic-reminders.davidsen908.workers.dev';
+  const LOG_KEY = 'pfLog_v1';       // [{ts, hold, rest, reps, quicks, preset}]
+  const CFG_KEY = 'pfCfg_v1';       // {preset, hold, rest, reps, quicks}
+  const REM_KEY = 'pfRem_v1';       // [{on, t}, ...]
+  const PUSH_FLAG = 'pfPushOn_v1';
+
+  const $ = (id) => document.getElementById(id);
+
+  // ---- theme ----
+  const themeBtn = $('themeBtn');
+  function paintThemeBtn() { themeBtn.textContent = document.documentElement.dataset.theme === 'light' ? '🌙' : '☀️'; }
+  themeBtn.addEventListener('click', () => {
+    const next = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
+    document.documentElement.dataset.theme = next;
+    try { localStorage.setItem('pfTheme', next); } catch(e) {}
+    paintThemeBtn();
+  });
+  paintThemeBtn();
+
+  // ---- config / presets ----
+  const PRESETS = {
+    gentle:   { hold: 3,  rest: 6,  reps: 8,  quicks: 0 },
+    building: { hold: 6,  rest: 6,  reps: 10, quicks: 5 },
+    full:     { hold: 10, rest: 5,  reps: 10, quicks: 10 },
+  };
+  let cfg = (function(){
+    try { const raw = localStorage.getItem(CFG_KEY); if (raw) return JSON.parse(raw); } catch(e) {}
+    return { preset: 'gentle', ...PRESETS.gentle };
+  })();
+  function saveCfg() { try { localStorage.setItem(CFG_KEY, JSON.stringify(cfg)); } catch(e) {} }
+  function sessionSecs(c) { return 3 + c.reps * c.hold + (c.reps - 1) * c.rest + (c.quicks ? 4 + c.quicks * 2 + c.rest : 0); }
+  function paintCfg() {
+    $('presets').querySelectorAll('button').forEach(b => b.classList.toggle('sel', b.dataset.p === cfg.preset));
+    $('customFields').classList.toggle('open', cfg.preset === 'custom');
+    $('cfHold').value = cfg.hold; $('cfRest').value = cfg.rest; $('cfReps').value = cfg.reps; $('cfQuicks').value = cfg.quicks;
+    $('customDesc').textContent = cfg.preset === 'custom' ? `${cfg.hold}s hold ×${cfg.reps}${cfg.quicks ? ' + ' + cfg.quicks + ' quick' : ''}` : 'your own timings';
+    const s = sessionSecs(cfg);
+    $('estLabel').textContent = `${cfg.hold}s hold / ${cfg.rest}s rest ×${cfg.reps}${cfg.quicks ? ` + ${cfg.quicks} quick` : ''} · ~${Math.round(s / 60) || 1} min`;
+  }
+  $('presets').addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    cfg.preset = b.dataset.p;
+    if (PRESETS[cfg.preset]) Object.assign(cfg, PRESETS[cfg.preset]);
+    saveCfg(); paintCfg();
+  });
+  for (const [id, key, lo, hi] of [['cfHold','hold',1,15], ['cfRest','rest',2,20], ['cfReps','reps',3,20], ['cfQuicks','quicks',0,20]]) {
+    $(id).addEventListener('change', () => {
+      const v = Math.max(lo, Math.min(hi, parseInt($(id).value) || lo));
+      $(id).value = v; cfg[key] = v; cfg.preset = 'custom'; saveCfg(); paintCfg();
+    });
+  }
+
+  // ---- log / progress ----
+  let log = (function(){ try { return JSON.parse(localStorage.getItem(LOG_KEY)) || []; } catch(e) { return []; } })();
+  function saveLog() { try { localStorage.setItem(LOG_KEY, JSON.stringify(log)); } catch(e) {} }
+  const dayKey = (ts) => { const d = new Date(ts); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
+  function countsByDay() {
+    const m = {};
+    for (const e of log) m[dayKey(e.ts)] = (m[dayKey(e.ts)] || 0) + 1;
+    return m;
+  }
+  function paintProgress() {
+    const counts = countsByDay();
+    const today = counts[dayKey(Date.now())] || 0;
+    $('todayDots').querySelectorAll('.tdot').forEach((d, i) => d.classList.toggle('done', i < today));
+    // streak: consecutive days (ending today or yesterday) with >=1 session
+    let streak = 0;
+    let d = new Date();
+    if (!counts[dayKey(d)]) d.setDate(d.getDate() - 1); // today not yet done doesn't break it
+    while (counts[dayKey(d)]) { streak++; d.setDate(d.getDate() - 1); }
+    $('streakLabel').innerHTML = streak > 0 ? `🔥 <b>${streak}</b> day${streak === 1 ? '' : 's'}` : 'No streak yet';
+    // calendar: current week + 4 before
+    const cal = $('calendar');
+    let html = '';
+    for (const h of ['M','T','W','T','F','S','S']) html += `<div class="dh">${h}</div>`;
+    const now = new Date(); now.setHours(0,0,0,0);
+    const monday = new Date(now); monday.setDate(now.getDate() - ((now.getDay() + 6) % 7) - 28);
+    for (let i = 0; i < 35; i++) {
+      const day = new Date(monday); day.setDate(monday.getDate() + i);
+      const n = counts[dayKey(day)] || 0;
+      const cls = ['day', n >= 3 ? 's3' : n === 2 ? 's2' : n === 1 ? 's1' : '',
+        day.getTime() === now.getTime() ? 'today' : '', day > now ? 'future' : ''].filter(Boolean).join(' ');
+      html += `<div class="${cls}">${day.getDate()}</div>`;
+    }
+    cal.innerHTML = html;
+    // level-up hint: 5 consecutive days with 2+ sessions on a non-full preset
+    let ok = 0; d = new Date(); d.setDate(d.getDate() - 1);
+    for (let i = 0; i < 5; i++) { if ((counts[dayKey(d)] || 0) >= 2) ok++; d.setDate(d.getDate() - 1); }
+    $('lvlHint').style.display = ok >= 5 && cfg.preset !== 'full' && cfg.preset !== 'custom' ? 'block' : 'none';
+  }
+
+  // ---- session player ----
+  // Schedule: prep -> reps x (hold + rest) -> (prep -> quicks x (1s on + 1s off))
+  function buildSchedule(c) {
+    const ph = [{ label: 'Get ready', sub: 'Breathe normally — nothing else should move', dur: 3, kind: 'prep' }];
+    for (let i = 0; i < c.reps; i++) {
+      ph.push({ label: 'Squeeze & lift', sub: `Hold ${i + 1} of ${c.reps}`, dur: c.hold, kind: 'squeeze' });
+      if (i < c.reps - 1 || c.quicks) ph.push({ label: 'Relax fully', sub: 'Let go completely', dur: c.rest, kind: 'relax' });
+    }
+    if (c.quicks) {
+      ph.push({ label: 'Now: quick squeezes', sub: 'Fast squeeze — instant release', dur: 4, kind: 'prep' });
+      for (let i = 0; i < c.quicks; i++) {
+        ph.push({ label: 'Quick!', sub: `${i + 1} of ${c.quicks}`, dur: 1, kind: 'squeeze', quick: true });
+        ph.push({ label: 'Release', sub: '', dur: 1, kind: 'relax', quick: true });
+      }
+    }
+    return ph;
+  }
+
+  let audioCtx = null;
+  document.addEventListener('pointerdown', () => {
+    if (!audioCtx) { try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) {} }
+    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+  });
+  function tone(freq, dur = 0.12, gain = 0.18) {
+    if (!audioCtx || audioCtx.state !== 'running') return;
+    try {
+      const t = audioCtx.currentTime;
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.frequency.value = freq; o.type = 'sine';
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(gain, t + 0.015);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g); g.connect(audioCtx.destination);
+      o.start(t); o.stop(t + dur + 0.02);
+    } catch(e) {}
+  }
+
+  let sess = null; // {schedule, idx, startTs, pausedAt, pausedTotal, timer}
+  let wakeLock = null;
+  async function grabWakeLock() { try { wakeLock = await navigator.wakeLock.request('screen'); } catch(e) {} }
+  function dropWakeLock() { try { wakeLock && wakeLock.release(); } catch(e) {} wakeLock = null; }
+
+  function cue(ph) {
+    if (ph.kind === 'squeeze') { tone(660); tone(880, 0.12, 0.14); if (navigator.vibrate) try { navigator.vibrate(ph.quick ? 90 : [120, 60, 120]); } catch(e) {} }
+    else if (ph.kind === 'relax') { tone(440); if (navigator.vibrate) try { navigator.vibrate(60); } catch(e) {} }
+    else tone(550);
+  }
+  function paintPhase(ph, remaining) {
+    $('sessPhase').textContent = ph.label;
+    $('sessSub').textContent = ph.sub;
+    $('sessCountdown').textContent = ph.quick ? '' : Math.ceil(remaining);
+    $('sessProgress').textContent = ph.kind === 'prep' ? '' : ph.sub;
+    const c = $('sessCircle');
+    c.style.transition = `transform ${ph.quick ? 0.18 : Math.min(ph.dur, 1.2)}s ease`;
+    c.style.transform = ph.kind === 'squeeze' ? 'scale(1.28)' : ph.kind === 'relax' ? 'scale(0.72)' : 'scale(0.85)';
+  }
+  function sessTick() {
+    if (!sess || sess.pausedAt) return;
+    const elapsed = (Date.now() - sess.startTs - sess.pausedTotal) / 1000;
+    let t = 0, idx = -1, remaining = 0;
+    for (let i = 0; i < sess.schedule.length; i++) {
+      if (elapsed < t + sess.schedule[i].dur) { idx = i; remaining = t + sess.schedule[i].dur - elapsed; break; }
+      t += sess.schedule[i].dur;
+    }
+    if (idx === -1) { finishSession(); return; }
+    const ph = sess.schedule[idx];
+    if (idx !== sess.idx) { sess.idx = idx; cue(ph); }
+    paintPhase(ph, remaining);
+  }
+  function startSession() {
+    sess = { schedule: buildSchedule(cfg), idx: -1, startTs: Date.now(), pausedAt: null, pausedTotal: 0 };
+    $('sessRun').style.display = ''; $('sessDone').style.display = 'none';
+    $('sessPause').textContent = 'Pause';
+    $('sessionOverlay').classList.add('open');
+    grabWakeLock();
+    sess.timer = setInterval(sessTick, 100);
+    sessTick();
+  }
+  function endSession() {
+    if (sess) clearInterval(sess.timer);
+    sess = null;
+    dropWakeLock();
+    $('sessionOverlay').classList.remove('open');
+  }
+  function finishSession() {
+    clearInterval(sess.timer);
+    log.push({ ts: Date.now(), hold: cfg.hold, rest: cfg.rest, reps: cfg.reps, quicks: cfg.quicks, preset: cfg.preset });
+    saveLog();
+    tone(660); tone(880, 0.3, 0.16); if (navigator.vibrate) try { navigator.vibrate([100, 60, 100, 60, 200]); } catch(e) {}
+    const today = countsByDay()[dayKey(Date.now())] || 0;
+    $('doneSub').textContent = `${today} of 3 sessions today${today >= 3 ? ' — all done! 🌸' : ''}`;
+    $('sessRun').style.display = 'none'; $('sessDone').style.display = '';
+    sess = null;
+    dropWakeLock();
+    paintProgress();
+  }
+  $('startBtn').addEventListener('click', startSession);
+  $('sessStop').addEventListener('click', endSession);
+  $('doneClose').addEventListener('click', () => $('sessionOverlay').classList.remove('open'));
+  $('sessPause').addEventListener('click', () => {
+    if (!sess) return;
+    if (sess.pausedAt) { sess.pausedTotal += Date.now() - sess.pausedAt; sess.pausedAt = null; $('sessPause').textContent = 'Pause'; }
+    else { sess.pausedAt = Date.now(); $('sessPause').textContent = 'Resume'; $('sessPhase').textContent = 'Paused'; }
+  });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && sess) grabWakeLock(); });
+
+  // ---- reminders (per-device push; the worker stores only times + subscription) ----
+  const REM_DEFAULT = [{ on: false, t: '09:00' }, { on: false, t: '13:30' }, { on: false, t: '20:30' }];
+  let rem = (function(){ try { return JSON.parse(localStorage.getItem(REM_KEY)) || REM_DEFAULT; } catch(e) { return REM_DEFAULT; } })();
+  const REM_IDS = [['rem1On', 'rem1T'], ['rem2On', 'rem2T'], ['rem3On', 'rem3T']];
+  function paintRem() { REM_IDS.forEach(([on, t], i) => { $(on).checked = !!rem[i].on; $(t).value = rem[i].t; }); }
+  REM_IDS.forEach(([on, t], i) => {
+    $(on).addEventListener('change', () => { rem[i].on = $(on).checked; saveRem(); });
+    $(t).addEventListener('change', () => { if (/^\d{2}:\d{2}$/.test($(t).value)) { rem[i].t = $(t).value; saveRem(); } });
+  });
+  function saveRem() {
+    try { localStorage.setItem(REM_KEY, JSON.stringify(rem)); } catch(e) {}
+    if (pushOn()) subscribePush().then(updatePushUI).catch(() => {});
+  }
+
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  const pushSupported = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+  const pushOn = () => { try { return !!localStorage.getItem(PUSH_FLAG); } catch(e) { return false; } };
+  function b64uToU8(s) {
+    const b = s.replace(/-/g, '+').replace(/_/g, '/');
+    return Uint8Array.from(atob(b + '='.repeat((4 - b.length % 4) % 4)), c => c.charCodeAt(0));
+  }
+  function setPushStatus(cls, msg) { const el = $('pushStatus'); el.className = 'pushstatus' + (cls ? ' ' + cls : ''); el.textContent = msg; }
+
+  async function vapidKey() {
+    try { const c = localStorage.getItem('pfVapid_v1'); if (c) return c; } catch(e) {}
+    const d = await (await fetch(`${REMINDER_URL}/vapid`)).json();
+    try { localStorage.setItem('pfVapid_v1', d.publicKey); } catch(e) {}
+    return d.publicKey;
+  }
+  async function subscribePush() {
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64uToU8(await vapidKey()) });
+    const times = rem.filter(r => r.on).map(r => r.t);
+    const r = await fetch(`${REMINDER_URL}/subscribe`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...sub.toJSON(), times, tz: Intl.DateTimeFormat().resolvedOptions().timeZone }),
+    });
+    if (!r.ok) throw new Error('subscribe failed');
+    return sub;
+  }
+  function updatePushUI() {
+    $('pushTest').style.display = 'none';
+    if (!pushSupported()) {
+      $('pushToggle').style.display = 'none';
+      if (isIOS && !isStandalone()) setPushStatus('warn', 'On iPhone: tap Share → “Add to Home Screen”, then open the app from its icon to enable reminders.');
+      else setPushStatus('warn', 'Notifications are not supported in this browser.');
+      return;
+    }
+    $('pushToggle').style.display = '';
+    const n = rem.filter(r => r.on).length;
+    if (pushOn() && Notification.permission === 'granted') {
+      setPushStatus('ok', n ? `Reminders ON — ${rem.filter(r => r.on).map(r => r.t).join(', ')} ✓` : 'Notifications enabled — now tick at least one reminder time above.');
+      $('pushToggle').textContent = 'Disable notifications';
+      $('pushTest').style.display = '';
+    } else if (Notification.permission === 'denied') {
+      setPushStatus('warn', 'Notifications are blocked — allow them for this site in your browser/system settings, then try again.');
+      $('pushToggle').textContent = 'Enable notifications';
+    } else {
+      setPushStatus('', 'Get a gentle nudge at your chosen times, even with the app closed.');
+      $('pushToggle').textContent = 'Enable notifications';
+    }
+  }
+  $('pushToggle').addEventListener('click', async () => {
+    try {
+      if (pushOn() && Notification.permission === 'granted') {
+        const reg = await navigator.serviceWorker.ready;
+        const sub = await reg.pushManager.getSubscription();
+        if (sub) {
+          await fetch(`${REMINDER_URL}/unsubscribe`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ endpoint: sub.endpoint }) });
+          await sub.unsubscribe();
+        }
+        localStorage.removeItem(PUSH_FLAG);
+      } else {
+        const perm = await Notification.requestPermission();
+        if (perm !== 'granted') { updatePushUI(); return; }
+        if (!rem.some(r => r.on)) { rem[0].on = true; paintRem(); try { localStorage.setItem(REM_KEY, JSON.stringify(rem)); } catch(e) {} }
+        await subscribePush();
+        localStorage.setItem(PUSH_FLAG, '1');
+      }
+    } catch (e) {
+      setPushStatus('warn', 'Could not update reminders — check your connection and try again.');
+      return;
+    }
+    updatePushUI();
+  });
+  $('pushTest').addEventListener('click', async () => {
+    $('pushTest').disabled = true;
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      const d = await (await fetch(`${REMINDER_URL}/test`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ endpoint: sub.endpoint }) })).json();
+      setPushStatus(d.ok ? 'ok' : 'warn', d.ok ? 'Test sent ✓ — it can take a few seconds to appear.' : 'Test failed — try disabling and re-enabling notifications.');
+    } catch (e) { setPushStatus('warn', 'Test failed — check your connection.'); }
+    $('pushTest').disabled = false;
+  });
+  async function ensurePush() { // keep the server's copy fresh across push-service rotations
+    if (!pushOn() || !pushSupported() || Notification.permission !== 'granted') return;
+    try { await subscribePush(); } catch(e) {}
+  }
+
+  // ---- init ----
+  paintCfg();
+  paintProgress();
+  paintRem();
+  updatePushUI();
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').then(ensurePush).catch(() => {});
+  setInterval(paintProgress, 60000); // roll the day over if left open
+</script>
+</body>
+</html>
