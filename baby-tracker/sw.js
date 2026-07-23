@@ -31,15 +31,18 @@ self.addEventListener('fetch', (e) => {
 self.addEventListener('push', (e) => {
   let d = {};
   try { d = e.data.json(); } catch (err) {}
-  // crit: 'low' = silent; 'high' = sticky + re-buzz on repeats (where supported)
+  // crit: 'low' = silent; 'high'/'alarm' = sticky + re-buzz on repeats; 'alarm'
+  // additionally gets the longest vibration pattern (where supported)
+  const strong = d.crit === 'high' || d.crit === 'alarm';
   e.waitUntil(self.registration.showNotification(d.title || 'Baby Tracker', {
     body: d.body || '',
     tag: d.tag || 'bt',
     icon: './icon-192.png',
     badge: './icon-192.png',
     silent: d.crit === 'low',
-    requireInteraction: d.crit === 'high',
-    renotify: d.crit === 'high',
+    requireInteraction: strong,
+    renotify: strong,
+    vibrate: d.crit === 'alarm' ? [500, 150, 500, 150, 800] : strong ? [300, 120, 300] : undefined,
   }));
 });
 
