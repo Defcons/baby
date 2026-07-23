@@ -447,8 +447,9 @@
     if (m === 0) return `${sec}s`;
     return `${m}m ${sec}s`;
   }
-  function fmtClock(ts) {
-    return new Date(ts).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+  function fmtClock(ts) { // always 24h, regardless of device locale
+    const d = new Date(ts);
+    return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
   }
   function esc(s) {
     return s.replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
