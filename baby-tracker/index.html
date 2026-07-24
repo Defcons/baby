@@ -542,6 +542,7 @@
         <div class="pushstatus" style="margin-top:6px;">Quiet = silent, once. Normal = sound, repeats every 30 min. Nag = sound, repeats every 10 min until logged. Alarm = rings out loud like a timer on any device showing the app, plus the strongest push every 5 min. During quiet hours nothing is sent; pending alerts arrive when they end. If pushes stop arriving with the app closed, turn off battery optimization for your browser/app in Android settings.</div>
         <div class="pushstatus" id="srvStatus" style="margin-top:6px;"></div>
       </div>
+      <div class="pushstatus" style="margin-top:10px;">Integrations (Home Assistant etc.): <a href="#" id="copyRoom" style="color:var(--accent);">copy room id</a></div>
       <div class="btns">
         <button id="switchBaby">Switch baby / sign out</button>
         <button id="alertsClose">Close</button>
@@ -2226,6 +2227,17 @@
       localStorage.removeItem(PUSH_FLAG);
     } catch(e) {}
     location.reload();
+  });
+
+  // room id doubles as the API credential for integrations (POST /log, GET /summary)
+  document.getElementById('copyRoom').addEventListener('click', async (e) => {
+    e.preventDefault();
+    if (!room) return;
+    try {
+      await navigator.clipboard.writeText(room);
+      e.target.textContent = 'copied ✓';
+      setTimeout(() => { e.target.textContent = 'copy room id'; }, 2000);
+    } catch(err) { prompt('Room id (copy manually):', room); }
   });
 
   // per-device name stamped onto entries this device logs
