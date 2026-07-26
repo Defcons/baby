@@ -333,6 +333,13 @@
   .histrow.head { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; }
   .histrow .day { color: var(--soft); }
   .histrow .histsub { color: var(--muted); font-size: 11px; }
+  .histrow.avg { font-weight: 600; }
+  .histrow.avg .day { color: var(--accent); }
+  .histmore { text-align: center; padding: 8px 0 4px; }
+  .histmore button {
+    padding: 7px 16px; font-size: 12px; border-radius: 8px; cursor: pointer;
+    border: 1px solid var(--border); background: var(--card); color: var(--soft);
+  }
   .histbtns { display: flex; justify-content: flex-end; margin-top: 8px; }
   .histbtns button {
     padding: 8px 14px; font-size: 12px; border-radius: 8px; cursor: pointer;
@@ -1562,26 +1569,64 @@
     render();
   }
 
-  // ---- daily history (last 7 days from the hot window) + CSV export ----
+  // ---- daily history: last 7 days (expandable) + a 7-full-day average row ----
+  let histDays = 7;
   function renderHistory() {
     const el = document.getElementById('history');
     const dayFmt = new Intl.DateTimeFormat([], { weekday: 'short', day: 'numeric', month: 'short' });
     const toMl = (e) => (e.amount || 0) * (e.unit === 'oz' ? 29.57 : 1);
+    const statsFor = (day0) => {
+      const t0 = day0.getTime(), t1 = t0 + 86400000;
+      const list = entries.filter(e => e.start >= t0 && e.start < t1);
+      return {
+        count: list.length,
+        feeds: list.filter(e => e.type === 'nurse' || e.type === 'bottle' || e.type === 'solid').length,
+        nurseMin: Math.round(list.filter(e => e.type === 'nurse').reduce((n, e) => n + (e.duration || 0), 0) / 60000),
+        ml: Math.round(list.filter(e => e.type === 'bottle').reduce((n, e) => n + toMl(e), 0)),
+        sleepMs: list.filter(e => e.type === 'sleep').reduce((n, e) => n + (e.duration || 0), 0),
+        diapers: list.filter(e => e.type === 'diaper').length,
+      };
+    };
     let html = '<div class="histrow head"><span>Day</span><span>Feeds</span><span>Bottle</span><span>Sleep</span><span>Diapers</span></div>';
-    for (let d = 0; d < 7; d++) {
-      const day0 = new Date(); day0.setHours(0, 0, 0, 0); day0.setDate(day0.getDate() - d);
-      const day1 = day0.getTime() + 86400000;
-      const todays = entries.filter(e => e.start >= day0.getTime() && e.start < day1);
-      if (d > 0 && todays.length === 0) continue;
-      const feeds = todays.filter(e => e.type === 'nurse' || e.type === 'bottle' || e.type === 'solid').length;
-      const nurseMin = Math.round(todays.filter(e => e.type === 'nurse').reduce((n, e) => n + (e.duration || 0), 0) / 60000);
-      const ml = Math.round(todays.filter(e => e.type === 'bottle').reduce((n, e) => n + toMl(e), 0));
-      const sleepMs = todays.filter(e => e.type === 'sleep').reduce((n, e) => n + (e.duration || 0), 0);
-      const diapers = todays.filter(e => e.type === 'diaper').length;
-      html += `<div class="histrow"><span class="day">${d === 0 ? 'Today' : dayFmt.format(day0)}</span><span>${feeds}${nurseMin ? ` <span class="histsub">(${nurseMin}m)</span>` : ''}</span><span>${ml ? ml + ' ml' : '—'}</span><span>${sleepMs ? fmtShort(sleepMs) : '—'}</span><span>${diapers}</span></div>`;
+
+    const firstStart = entries.length ? entries.reduce((m, e) => Math.min(m, e.start), Infinity) : null;
+    const today0 = new Date(); today0.setHours(0, 0, 0, 0);
+
+    // average over the last up-to-7 FULL days (today excluded — it's partial)
+    if (firstStart !== null) {
+      let n = 0;
+      const tot = { feeds: 0, nurseMin: 0, ml: 0, sleepMs: 0, diapers: 0 };
+      for (let d = 1; d <= 7; d++) {
+        const day0 = new Date(today0); day0.setDate(today0.getDate() - d);
+        if (day0.getTime() + 86400000 <= firstStart) break; // before the log began
+        const s = statsFor(day0);
+        n++;
+        tot.feeds += s.feeds; tot.nurseMin += s.nurseMin; tot.ml += s.ml; tot.sleepMs += s.sleepMs; tot.diapers += s.diapers;
+      }
+      if (n > 0) {
+        const f1 = (v) => String(Math.round(v * 10) / 10);
+        const nm = Math.round(tot.nurseMin / n), ml = Math.round(tot.ml / n), sl = tot.sleepMs / n;
+        html += `<div class="histrow avg"><span class="day">Avg (${n}d)</span><span>${f1(tot.feeds / n)}${nm ? ` <span class="histsub">(${nm}m)</span>` : ''}</span><span>${ml ? ml + ' ml' : '—'}</span><span>${sl ? fmtShort(sl) : '—'}</span><span>${f1(tot.diapers / n)}</span></div>`;
+      }
+    }
+
+    for (let d = 0; d < histDays; d++) {
+      const day0 = new Date(today0); day0.setDate(today0.getDate() - d);
+      const s = statsFor(day0);
+      if (d > 0 && s.count === 0) continue;
+      html += `<div class="histrow"><span class="day">${d === 0 ? 'Today' : dayFmt.format(day0)}</span><span>${s.feeds}${s.nurseMin ? ` <span class="histsub">(${s.nurseMin}m)</span>` : ''}</span><span>${s.ml ? s.ml + ' ml' : '—'}</span><span>${s.sleepMs ? fmtShort(s.sleepMs) : '—'}</span><span>${s.diapers}</span></div>`;
+    }
+
+    // older data still in the hot window?
+    const oldestShown = new Date(today0); oldestShown.setDate(today0.getDate() - (histDays - 1));
+    if (firstStart !== null && firstStart < oldestShown.getTime()) {
+      html += '<div class="histmore"><button data-histmore>Show earlier days</button></div>';
     }
     el.innerHTML = html;
   }
+  document.getElementById('history').addEventListener('click', (e) => {
+    if (e.target.closest('[data-histmore]')) { histDays += 7; renderHistory(); }
+  });
 
   const CSV_COLS = ['date', 'time', 'type', 'duration_min', 'side', 'amount', 'unit', 'milk', 'kind', 'food', 'name', 'temp_c', 'weight_kg', 'length_cm', 'by', 'note'];
   function csvRow(e) {
