@@ -333,7 +333,14 @@
   .histrow.head { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; }
   .histrow .day { color: var(--soft); }
   .histrow .histsub { color: var(--muted); font-size: 11px; }
-  .histrow.avg { font-weight: 600; }
+  .histrow.avg {
+    font-weight: 600;
+    background: color-mix(in srgb, var(--accent) 16%, transparent);
+    border-radius: 8px;
+    border-bottom: none;
+    margin: 4px -6px;
+    padding: 8px 6px;
+  }
   .histrow.avg .day { color: var(--accent); }
   .histmore { text-align: center; padding: 8px 0 4px; }
   .histmore button {
