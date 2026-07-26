@@ -54,6 +54,7 @@
   }
   .top { display: flex; align-items: flex-start; justify-content: space-between; }
   h1 { font-size: 20px; font-weight: 600; margin-bottom: 4px; letter-spacing: -0.01em; }
+  h1 .agechip { font-size: 13px; font-weight: 400; color: var(--muted); }
   .sub { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
   .topbtns { display: flex; gap: 8px; }
   .themebtn, .navlink {
@@ -331,6 +332,7 @@
   .histrow:last-child { border-bottom: none; }
   .histrow.head { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; }
   .histrow .day { color: var(--soft); }
+  .histrow .histsub { color: var(--muted); font-size: 11px; }
   .histbtns { display: flex; justify-content: flex-end; margin-top: 8px; }
   .histbtns button {
     padding: 8px 14px; font-size: 12px; border-radius: 8px; cursor: pointer;
@@ -1178,8 +1180,22 @@
     const b = AGE_BANDS.find(r => weeks < r[0]) || AGE_BANDS[AGE_BANDS.length - 1];
     return { feed: [b[1], b[2]], diaper: [b[3], b[4]], awake: [b[5], b[6]] };
   }
+  function babyAgeLabel(now) {
+    const born = babyBornTs();
+    if (born === null || now < born) return '';
+    const days = Math.floor((now - born) / 86400000);
+    if (days < 31) return `${days}d`;
+    const b = new Date(born), n = new Date(now);
+    let months = (n.getFullYear() - b.getFullYear()) * 12 + (n.getMonth() - b.getMonth());
+    let anchor = new Date(b); anchor.setMonth(b.getMonth() + months);
+    if (anchor > n) { months--; anchor = new Date(b); anchor.setMonth(b.getMonth() + months); }
+    const rest = Math.floor((n - anchor) / 86400000);
+    return rest ? `${months}m ${rest}d` : `${months}m`;
+  }
   function paintBaby() {
-    document.querySelector('.top h1').textContent = baby.name || 'Baby Tracker';
+    const age = babyAgeLabel(Date.now());
+    document.querySelector('.top h1').innerHTML =
+      esc(baby.name || 'Baby Tracker') + (age ? ` <span class="agechip">(${age})</span>` : '');
     document.title = baby.name ? `${baby.name} — Baby Tracker` : 'Baby Tracker';
   }
 
@@ -1253,8 +1269,10 @@
     const today0 = startOfToday();
     const todays = entries.filter(e => e.start >= today0);
     const feedCount = todays.filter(e => e.type === 'nurse' || e.type === 'bottle' || e.type === 'solid').length;
+    const nurseMin = Math.round(todays.filter(e => e.type === 'nurse').reduce((n, e) => n + (e.duration || 0), 0) / 60000);
     const diaperCount = todays.filter(e => e.type === 'diaper').length;
-    document.getElementById('todaySummary').textContent = `${feedCount} feed${feedCount===1?'':'s'} · ${diaperCount} diaper${diaperCount===1?'':'s'}`;
+    document.getElementById('todaySummary').textContent =
+      `${feedCount} feed${feedCount===1?'':'s'}${nurseMin ? ` (${nurseMin}m)` : ''} · ${diaperCount} diaper${diaperCount===1?'':'s'}`;
 
     // "(X ago)" on the action buttons; running timers own their own sub text.
     // Nurse/diaper/sleep subs carry the age-aware urgency color (nurse uses the
@@ -1556,10 +1574,11 @@
       const todays = entries.filter(e => e.start >= day0.getTime() && e.start < day1);
       if (d > 0 && todays.length === 0) continue;
       const feeds = todays.filter(e => e.type === 'nurse' || e.type === 'bottle' || e.type === 'solid').length;
+      const nurseMin = Math.round(todays.filter(e => e.type === 'nurse').reduce((n, e) => n + (e.duration || 0), 0) / 60000);
       const ml = Math.round(todays.filter(e => e.type === 'bottle').reduce((n, e) => n + toMl(e), 0));
       const sleepMs = todays.filter(e => e.type === 'sleep').reduce((n, e) => n + (e.duration || 0), 0);
       const diapers = todays.filter(e => e.type === 'diaper').length;
-      html += `<div class="histrow"><span class="day">${d === 0 ? 'Today' : dayFmt.format(day0)}</span><span>${feeds}</span><span>${ml ? ml + ' ml' : '—'}</span><span>${sleepMs ? fmtShort(sleepMs) : '—'}</span><span>${diapers}</span></div>`;
+      html += `<div class="histrow"><span class="day">${d === 0 ? 'Today' : dayFmt.format(day0)}</span><span>${feeds}${nurseMin ? ` <span class="histsub">(${nurseMin}m)</span>` : ''}</span><span>${ml ? ml + ' ml' : '—'}</span><span>${sleepMs ? fmtShort(sleepMs) : '—'}</span><span>${diapers}</span></div>`;
     }
     el.innerHTML = html;
   }
@@ -2374,7 +2393,7 @@
   pull();
   // no polling while hidden — visibilitychange pulls the moment we're back
   setInterval(() => { if (!document.hidden) pull(); }, POLL_MS);
-  setInterval(() => { updateStats(); renderTimeline(); evalLocalAlarms(); }, 15000);
+  setInterval(() => { updateStats(); renderTimeline(); evalLocalAlarms(); paintBaby(); }, 15000); // paintBaby: age rolls over at midnight
   evalLocalAlarms();
   document.addEventListener('visibilitychange', () => { if (!document.hidden) pull(); });
   window.addEventListener('online', pull);
