@@ -338,6 +338,30 @@ script:
             ago_min: "{{ ago_min | default(0) | int }}"
             note: "{{ note | default('') }}"
 
+  baby_log_bath:
+    alias: "Baby: log bath"
+    icon: mdi:bathtub
+    description: >-
+      Log that the baby had a bath. Examples: "Gave the baby a bath" /
+      "bath time is done" / "she had a bath an hour ago" -> ago_min=60.
+    fields:
+      ago_min:
+        name: Minutes ago
+        description: How many minutes ago (0 = just now)
+        default: 0
+        selector: { number: { min: 0, max: 720, mode: box } }
+      note:
+        name: Note
+        description: Optional note
+        selector: { text: }
+    sequence:
+      - service: rest_command.baby_tracker_log
+        data:
+          payload:
+            type: bath
+            ago_min: "{{ ago_min | default(0) | int }}"
+            note: "{{ note | default('') }}"
+
 # ---- read side: one REST sensor polls /summary (keep scan_interval >= 120s —
 # it costs KV read quota), template sensors expose friendly entities so the
 # voice assistant can also ANSWER questions ("when did the baby last eat?",

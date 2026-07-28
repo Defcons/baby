@@ -393,6 +393,8 @@ export default {
       } else if (d.type === 'med') {
         if (typeof d.name !== 'string' || !d.name.trim()) return new Response('bad name', { status: 400, headers: CORS });
         e = { id: 'm' + now, type: 'med', start: now - ago, name: d.name.trim().slice(0, 60) };
+      } else if (d.type === 'bath') {
+        e = { id: 'w' + now, type: 'bath', start: now - ago };
       } else {
         return new Response('bad type', { status: 400, headers: CORS });
       }
