@@ -325,6 +325,7 @@
   .tldot.med { background: #9a6fc0; }
   .tldot.pump { background: #5f8fbf; }
   .tldot.health { background: #bf7d5f; }
+  .tldot.bath { background: #6aa7c8; }
 
   /* daily history table */
   .hist { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 6px 12px; font-size: 13px; }
@@ -463,6 +464,10 @@
       <span class="ico">🌡️</span>Health
       <span class="sub2" id="healthBtnSub">Temp / growth</span>
     </button>
+    <button class="actionbtn wide" id="bathBtn">
+      <span class="ico">🛁</span>Bath
+      <span class="sub2" id="bathBtnSub">Splish splash</span>
+    </button>
   </div>
   <div class="sidepick" id="nurseSidePick" style="display:none;">
     <button data-side="L">Left</button>
@@ -496,6 +501,7 @@
     <button data-t="solid" title="Solids">🥄</button>
     <button data-t="med" title="Medicine">💊</button>
     <button data-t="health" title="Health">🌡️</button>
+    <button data-t="bath" title="Bath">🛁</button>
   </div>
   <ul class="log" id="logList">
     <li class="empty">Nothing logged yet.</li>
@@ -784,7 +790,7 @@
         <label>Measurements (fill any)</label>
         <div class="row2">
           <input type="number" id="healthTemp" inputmode="decimal" step="0.1" placeholder="°C">
-          <input type="number" id="healthWeight" inputmode="decimal" step="0.01" placeholder="kg">
+          <input type="number" id="healthWeight" inputmode="numeric" step="10" placeholder="g">
           <input type="number" id="healthLength" inputmode="decimal" step="0.5" placeholder="cm">
         </div>
       </div>
@@ -806,6 +812,26 @@
       <div class="alarmico">⏰</div>
       <div id="alarmMsgs"></div>
       <button id="alarmStop">Stop</button>
+    </div>
+  </div>
+
+  <!-- Bath modal -->
+  <div class="overlay" id="bathOverlay">
+    <div class="modal">
+      <h3>Log bath</h3>
+      <div class="field">
+        <label for="bathTime">Time</label>
+        <input type="time" id="bathTime" step="60">
+      </div>
+      <div class="field">
+        <label for="bathNote">Note (optional)</label>
+        <input type="text" id="bathNote" maxlength="120" placeholder="e.g. hair wash, loved it">
+      </div>
+      <div class="err" id="bathErr"></div>
+      <div class="btns">
+        <button id="bathCancel">Cancel</button>
+        <button class="primary" id="bathSave">Save</button>
+      </div>
     </div>
   </div>
 
@@ -868,10 +894,10 @@
         <input type="text" id="editMedName" maxlength="60">
       </div>
       <div class="field" id="editHealthWrap">
-        <label>Measurements (°C / kg / cm)</label>
+        <label>Measurements (°C / g / cm)</label>
         <div class="row2">
           <input type="number" id="editHealthTemp" inputmode="decimal" step="0.1" placeholder="°C">
-          <input type="number" id="editHealthWeight" inputmode="decimal" step="0.01" placeholder="kg">
+          <input type="number" id="editHealthWeight" inputmode="numeric" step="10" placeholder="g">
           <input type="number" id="editHealthLength" inputmode="decimal" step="0.5" placeholder="cm">
         </div>
       </div>
@@ -1140,6 +1166,7 @@
     if (e.type === 'med') return '💊';
     if (e.type === 'pump') return ICO_PUMP;
     if (e.type === 'health') return '🌡️';
+    if (e.type === 'bath') return '🛁';
     return '•';
   }
   function entryTypeLabel(e) {
@@ -1151,12 +1178,14 @@
     if (e.type === 'med') return 'Medicine';
     if (e.type === 'pump') return 'Pump';
     if (e.type === 'health') return 'Health';
+    if (e.type === 'bath') return 'Bath';
     return e.type;
   }
+  function toGrams(w) { return w == null ? null : Math.round(w < 100 ? w * 1000 : w); } // legacy entries stored kg
   function healthDetail(e) {
     const parts = [];
     if (e.temp != null) parts.push(`${e.temp}°C`);
-    if (e.weight != null) parts.push(`${e.weight} kg`);
+    if (e.weight != null) parts.push(`${toGrams(e.weight)} g`);
     if (e.length != null) parts.push(`${e.length} cm`);
     return parts.join(' · ');
   }
@@ -1310,6 +1339,7 @@
     document.getElementById('pumpBtnSub').textContent = agoOr('pump', 'Amount & side');
     document.getElementById('medBtnSub').textContent = agoOr('med', 'Vitamins etc.');
     document.getElementById('healthBtnSub').textContent = agoOr('health', 'Temp / growth');
+    document.getElementById('bathBtnSub').textContent = agoOr('bath', 'Splish splash');
   }
 
   // ---- activity timeline: one lane per type; bars for durations, dots/icons for
@@ -1342,6 +1372,7 @@
     { type: 'solid', ico: '🥄' },
     { type: 'med', ico: '💊' },
     { type: 'health', ico: '🌡️' },
+    { type: 'bath', ico: '🛁' },
   ];
   // hour-aligned clock ticks for the current span (used for gridlines + axis labels)
   function tlTicks(from, now) {
@@ -1658,7 +1689,7 @@
     if (e.target.closest('[data-histmore]')) { histDays += 7; renderHistory(); }
   });
 
-  const CSV_COLS = ['date', 'time', 'type', 'duration_min', 'side', 'amount', 'unit', 'milk', 'kind', 'food', 'name', 'temp_c', 'weight_kg', 'length_cm', 'by', 'note'];
+  const CSV_COLS = ['date', 'time', 'type', 'duration_min', 'side', 'amount', 'unit', 'milk', 'kind', 'food', 'name', 'temp_c', 'weight_g', 'length_cm', 'by', 'note'];
   function csvRow(e) {
     const v = {
       date: dateInputVal(e.start), // local date — toISOString would shift post-midnight entries to the previous UTC day
@@ -1667,7 +1698,7 @@
       duration_min: e.duration ? Math.round(e.duration / 60000) : '',
       side: e.side || '', amount: e.amount ?? '', unit: e.unit || '', milk: e.milk || '',
       kind: e.kind || '', food: e.food || '', name: e.name || '',
-      temp_c: e.temp ?? '', weight_kg: e.weight ?? '', length_cm: e.length ?? '',
+      temp_c: e.temp ?? '', weight_g: e.weight != null ? toGrams(e.weight) : '', length_cm: e.length ?? '',
       by: e.by || '', note: e.note || '',
     };
     return CSV_COLS.map(c => `"${String(v[c]).replace(/"/g, '""')}"`).join(',');
@@ -2005,6 +2036,25 @@
     closeOverlay('healthOverlay');
   });
 
+  // Bath (instantaneous, note only)
+  document.getElementById('bathBtn').addEventListener('click', () => {
+    document.getElementById('bathTime').value = timeInputVal(Date.now());
+    document.getElementById('bathNote').value = '';
+    hideErr('bathErr');
+    openOverlay('bathOverlay');
+  });
+  document.getElementById('bathCancel').addEventListener('click', () => closeOverlay('bathOverlay'));
+  document.getElementById('bathOverlay').addEventListener('click', (e) => { if (e.target.id === 'bathOverlay') closeOverlay('bathOverlay'); });
+  document.getElementById('bathSave').addEventListener('click', () => {
+    const start = applyTimeBack(document.getElementById('bathTime').value);
+    if (start === null) { showErr('bathErr', 'Time must be HH:MM'); return; }
+    const note = document.getElementById('bathNote').value.trim();
+    autoWake(start); // a bath definitely means the baby is awake
+    entries.push(stamp({ id: 'w'+Date.now(), type: 'bath', start, note: note || undefined }));
+    touch(); render();
+    closeOverlay('bathOverlay');
+  });
+
   // ---- edit modal (type-aware) ----
   const editOverlay = document.getElementById('editOverlay');
   const editDate = document.getElementById('editDate');
@@ -2059,7 +2109,7 @@
       showWraps(['editMedWrap']);
     } else if (e.type === 'health') {
       document.getElementById('editHealthTemp').value = e.temp ?? '';
-      document.getElementById('editHealthWeight').value = e.weight ?? '';
+      document.getElementById('editHealthWeight').value = e.weight != null ? toGrams(e.weight) : '';
       document.getElementById('editHealthLength').value = e.length ?? '';
       showWraps(['editHealthWrap']);
     } else {
