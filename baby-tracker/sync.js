@@ -3,7 +3,7 @@
 //
 // State shape (all fields optional on the wire; normalizeState fills gaps):
 //   { revision, entries[], active:{sleep,nurse}, alerts, alertsRev,
-//     baby:{name,born}, babyRev, deleted:{id:ts}, archivedBefore }
+//     baby:{name,born,sex}, babyRev, deleted:{id:ts}, archivedBefore }
 // Entries carry `mt` (last-modified ts) for per-entry conflict resolution and
 // optionally `by` (device name). Deletes are tombstones so they survive merge.
 // `archivedBefore` is the server-set watermark: entries older than it live in
