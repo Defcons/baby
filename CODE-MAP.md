@@ -11,33 +11,37 @@ A family of small baby apps, one folder per app, each a static page on GitHub Pa
 
 Apps cross-link via small nav icons in the header (⏱️ / 🍼 / 🌸) but are fully independent — separate localStorage keys, separate sync rooms, separate Workers/KV namespaces. Each `worker/` dir contains `index.js` + its own `wrangler.toml`; deploy from inside that dir with `npx wrangler deploy` (needs `wrangler login`, account davidsen908).
 
-## Hosting / custom domain (GitHub Pages + TLS)
+## Hosting (GitHub Pages)
 
-The site is served by GitHub Pages at the custom domain in the root `CNAME`
-file (`baby.defc0n.no` → CNAME to `<user>.github.io` → GitHub Pages anycast
-IPs `185.199.108-111.153` / `2606:50c0:800x::153`). GitHub auto-provisions a
-Let's Encrypt cert for the custom domain.
+The site is served by GitHub Pages at the **default URL**
+`https://<user>.github.io/baby/` (i.e. `defcons.github.io/baby/`). There is no
+custom domain and no root `CNAME` file: a `baby.defc0n.no` custom domain was
+tried and **dropped 2026-08-06** (see gotchas). The `.github.io` host always
+has a valid `*.github.io` wildcard cert, so there is no cert to provision or
+wait on.
 
-Gotchas:
-- **Do NOT delete + re-add the `CNAME` file (or change the custom domain in
-  Settings → Pages).** Each time the custom domain changes, GitHub tears down
-  the existing Let's Encrypt cert, unticks "Enforce HTTPS", and re-issues a new
-  cert — which can take minutes to ~24h. During that window the edge serves a
-  cert that does not cover the hostname, and the browser shows
-  **`ERR_SSL_UNRECOGNIZED_NAME_ALERT`** (a TLS `unrecognized_name` alert). This
-  is a settings/propagation state, not an app bug. Fix: leave the CNAME alone,
-  wait for the green check next to the domain in Settings → Pages, then re-tick
-  "Enforce HTTPS". (Verified 2026-08-06: a delete+re-create of `CNAME` ~47s
-  apart produced exactly this error.)
-- The same `ERR_SSL_UNRECOGNIZED_NAME_ALERT` can also be *local* to one device:
-  if that device's DNS is being handled/overridden by a resolver that is down
-  or split-horizon (e.g. Tailscale MagicDNS showing "DNS unavailable"), the
-  hostname can fail to resolve or resolve to the wrong box, whose cert doesn't
-  match. Decisive test: open the site from a device that is **off** that
-  resolver (e.g. phone on cellular, Tailscale disabled). Works there but fails
-  on-tailnet → it's the local resolver, not GitHub. Fails everywhere → it's the
-  GitHub cert re-provisioning above. Public DNS resolving to the GitHub Pages
-  IPs (checkable with `dig baby.defc0n.no`) confirms the record itself is fine.
+Gotchas (TLS / `ERR_SSL_UNRECOGNIZED_NAME_ALERT`):
+- **Custom-domain cert churn.** If a custom domain is ever re-added via a root
+  `CNAME` file, do NOT delete + re-add it (or flip the domain in Settings →
+  Pages). Each change tears down the Let's Encrypt cert, unticks "Enforce
+  HTTPS", and re-issues a new one (minutes to ~24h); during that window the edge
+  serves a cert that doesn't cover the hostname and the browser shows
+  **`ERR_SSL_UNRECOGNIZED_NAME_ALERT`** (TLS `unrecognized_name`). Also, removing
+  the domain in Settings while leaving the `CNAME` file in the repo is only a
+  half-removal — the file re-adds the domain (cert-less) on the next build. To
+  fully drop a custom domain, remove BOTH the Settings entry and the `CNAME`
+  file. (Verified 2026-08-06: a delete+re-create of `CNAME` ~47s apart, then a
+  Settings-only removal, each reproduced the error.)
+- **Same error, local cause.** `ERR_SSL_UNRECOGNIZED_NAME_ALERT` on the plain
+  `*.github.io` URL is never GitHub's fault — that wildcard cert is always
+  present — so it means the *device's* DNS is misrouting the hostname to a
+  non-GitHub server. Seen 2026-08-06 alongside a Tailscale "DNS unavailable":
+  a broken/overriding local resolver (MagicDNS, a split-DNS rule for a private
+  domain, or a bad exit node) sent the request to the wrong box. Decisive test:
+  load from **off** that resolver (cellular / Tailscale disabled). Works there →
+  fix the local resolver, not GitHub. Public DNS for both hostnames resolves to
+  the GitHub Pages anycast IPs (`185.199.108-111.153` / `2606:50c0:800x::153`),
+  checkable with `dig`.
 
 ## KV ops budget (free tier: 100k reads / 1k writes / 1k deletes / 1k LISTS per day — see CLAUDE.md)
 
