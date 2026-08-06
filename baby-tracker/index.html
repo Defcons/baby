@@ -493,6 +493,10 @@
     <button data-side="R">Right</button>
     <button data-side="both">Both</button>
   </div>
+  <!-- Weight chart: in the left column so on 2-column (tablet/desktop) it sits
+       right under the action buttons; on phone it stacks here too -->
+  <div class="tlhead fullonly" style="margin-top:22px;"><h2>Weight</h2></div>
+  <div class="growth fullonly" id="growth"></div>
   </div>
 
   <div class="datacol fullonly">
@@ -525,9 +529,6 @@
   <ul class="log" id="logList">
     <li class="empty">Nothing logged yet.</li>
   </ul>
-
-  <div class="tlhead"><h2>Weight</h2></div>
-  <div class="growth" id="growth"></div>
 
   <div class="tlhead">
     <h2>Daily history</h2>
@@ -1495,12 +1496,14 @@
   // ---- log list: type filter chips + collapsible day sections (today always
   // open; past days start as a one-line summary header). Both are view state
   // only — in memory, so the sync poll's re-renders don't reset them. ----
-  let logLimit = 50;              // cap on rendered entry rows (day headers are free)
+  const TODAY_STEP = 5;          // today's log shows this many at first; "Load more" reveals the rest
+  let todayLimit = TODAY_STEP;
+  let pastWeeks = 1;             // how many weeks of past days to show; "Load more" adds one
   const LOG_FILTER_KEY = 'btLogFilter'; // per-device, survives reloads
   let logFilter = (function(){
     try {
       const v = localStorage.getItem(LOG_FILTER_KEY) || '';
-      return ['sleep','nurse','bottle','pump','diaper','solid','med','health'].includes(v) ? v : '';
+      return ['sleep','nurse','bottle','pump','diaper','solid','med','health','bath'].includes(v) ? v : '';
     } catch(e) { return ''; }
   })();
   const expandedDays = new Set(); // toDateString() keys of past days the user opened
@@ -1515,7 +1518,7 @@
     logFilter = b.dataset.t;
     try { localStorage.setItem(LOG_FILTER_KEY, logFilter); } catch(err) {}
     paintLogFilter();
-    logLimit = 50; // reset paging when the view changes
+    todayLimit = TODAY_STEP; pastWeeks = 1; // reset paging when the view changes
     render();
   });
   paintLogFilter();
@@ -1579,45 +1582,46 @@
     logList.innerHTML = '';
     const dayFmt = new Intl.DateTimeFormat([], { weekday: 'short', day: 'numeric', month: 'short' });
     const todayKey = new Date().toDateString();
-    let budget = logLimit; // entry rows only; collapsed content isn't "more", it's one tap away
-    let cut = 0;
-    let pastDays = 0, collapsedDays = 0;
+    const showmore = (attr, label) => {
+      const li = document.createElement('li');
+      li.className = 'showmore';
+      li.innerHTML = `<button ${attr}>${label}</button>`;
+      logList.appendChild(li);
+    };
+    const pastCap = pastWeeks * 7; // number of past day-sections to show
+    let pastShown = 0, pastHidden = 0, collapsedDays = 0;
     let i = 0;
     while (i < filtered.length) {
       const key = new Date(filtered[i].start).toDateString();
       const day = [];
       while (i < filtered.length && new Date(filtered[i].start).toDateString() === key) day.push(filtered[i++]);
       const isToday = key === todayKey;
-      const open = isToday || expandedDays.has(key);
-      if (!isToday) {
-        pastDays++;
+      if (isToday) {
+        // today: newest first, capped at todayLimit with a "Load more" for the rest
+        day.forEach((e, n) => { if (n < todayLimit) logList.appendChild(entryLi(e)); });
+        if (day.length > todayLimit) showmore('data-todaymore', `Load more… (${day.length - todayLimit} earlier today)`);
+      } else {
+        if (pastShown >= pastCap) { pastHidden++; continue; } // beyond the loaded weeks
+        pastShown++;
+        const open = expandedDays.has(key);
         if (!open) collapsedDays++;
         const h = document.createElement('li');
         h.className = 'dayhead';
         h.dataset.day = key;
         h.innerHTML = `<span><span class="arr">${open ? '▾' : '▸'}</span>${dayFmt.format(day[0].start)}</span><span class="daysum">${daySummary(day)}</span>`;
         logList.appendChild(h);
-      }
-      if (open) for (const e of day) {
-        if (budget <= 0) { cut++; continue; }
-        budget--;
-        logList.appendChild(entryLi(e));
+        if (open) for (const e of day) logList.appendChild(entryLi(e));
       }
     }
-    if (cut > 0) {
-      const li = document.createElement('li');
-      li.className = 'showmore';
-      li.innerHTML = `<button data-more="1">Show earlier (${cut} more)</button>`;
-      logList.appendChild(li);
-    }
-    expandAllBtn.style.display = pastDays ? '' : 'none';
+    if (pastHidden > 0) showmore('data-pastmore', `Load more… (${pastHidden} earlier day${pastHidden === 1 ? '' : 's'})`);
+    expandAllBtn.style.display = pastShown ? '' : 'none';
     expandAllBtn.textContent = collapsedDays ? 'Expand all' : 'Collapse all';
   }
 
   const logList = document.getElementById('logList');
   logList.addEventListener('click', (e) => {
-    const more = e.target.closest('[data-more]');
-    if (more) { logLimit += 100; render(); return; }
+    if (e.target.closest('[data-todaymore]')) { todayLimit = Infinity; render(); return; }
+    if (e.target.closest('[data-pastmore]')) { pastWeeks += 1; render(); return; }
     const dh = e.target.closest('.dayhead');
     if (dh) {
       const k = dh.dataset.day;
