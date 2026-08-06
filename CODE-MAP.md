@@ -11,6 +11,34 @@ A family of small baby apps, one folder per app, each a static page on GitHub Pa
 
 Apps cross-link via small nav icons in the header (⏱️ / 🍼 / 🌸) but are fully independent — separate localStorage keys, separate sync rooms, separate Workers/KV namespaces. Each `worker/` dir contains `index.js` + its own `wrangler.toml`; deploy from inside that dir with `npx wrangler deploy` (needs `wrangler login`, account davidsen908).
 
+## Hosting / custom domain (GitHub Pages + TLS)
+
+The site is served by GitHub Pages at the custom domain in the root `CNAME`
+file (`baby.defc0n.no` → CNAME to `<user>.github.io` → GitHub Pages anycast
+IPs `185.199.108-111.153` / `2606:50c0:800x::153`). GitHub auto-provisions a
+Let's Encrypt cert for the custom domain.
+
+Gotchas:
+- **Do NOT delete + re-add the `CNAME` file (or change the custom domain in
+  Settings → Pages).** Each time the custom domain changes, GitHub tears down
+  the existing Let's Encrypt cert, unticks "Enforce HTTPS", and re-issues a new
+  cert — which can take minutes to ~24h. During that window the edge serves a
+  cert that does not cover the hostname, and the browser shows
+  **`ERR_SSL_UNRECOGNIZED_NAME_ALERT`** (a TLS `unrecognized_name` alert). This
+  is a settings/propagation state, not an app bug. Fix: leave the CNAME alone,
+  wait for the green check next to the domain in Settings → Pages, then re-tick
+  "Enforce HTTPS". (Verified 2026-08-06: a delete+re-create of `CNAME` ~47s
+  apart produced exactly this error.)
+- The same `ERR_SSL_UNRECOGNIZED_NAME_ALERT` can also be *local* to one device:
+  if that device's DNS is being handled/overridden by a resolver that is down
+  or split-horizon (e.g. Tailscale MagicDNS showing "DNS unavailable"), the
+  hostname can fail to resolve or resolve to the wrong box, whose cert doesn't
+  match. Decisive test: open the site from a device that is **off** that
+  resolver (e.g. phone on cellular, Tailscale disabled). Works there but fails
+  on-tailnet → it's the local resolver, not GitHub. Fails everywhere → it's the
+  GitHub cert re-provisioning above. Public DNS resolving to the GitHub Pages
+  IPs (checkable with `dig baby.defc0n.no`) confirms the record itself is fine.
+
 ## KV ops budget (free tier: 100k reads / 1k writes / 1k deletes / 1k LISTS per day — see CLAUDE.md)
 
 Approximate steady state across the whole account (update when adding any recurring operation):
