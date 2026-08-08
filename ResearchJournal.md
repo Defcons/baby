@@ -92,6 +92,12 @@ The bounce also triggered a **full public-history audit** (David raised the bar 
 
 Lessons, both promoted to practice: (1) **fetch and compare against origin before building on any repo** — a clean `git status` says nothing about the remote; (2) topology-bearing run-books belong in the private config repo from the first line, never retrofitted out of a public one.
 
+## 2026-08-08 (evening) — CUTOVER EXECUTED: the family runs self-hosted
+
+David ran the real migration at 14:31 (ahead of script — the rehearsal folded into device setup). Verification was programmatic, not eyeballed: old-vs-new state diff **identical** (510 entries, matching id sets in both directions, same revision, same live sleep timer), pelvic 1/1, cron warmed, `/summary` live on the new origin, HA repointed (David-confirmed), phones switched the same evening. The freeze rule held — zero entries logged old-side after the copy. The old Pages/Workers stack stays untouched as the fallback through a 1–2 week watch (retirement checklist in ToDo).
+
+Post-cutover model: same worker logic and entry-merge sync, served by the home container; 3 s polls (origin-aware constant); pushes sent by the container's internal cron through the browsers' push services. Remaining human proofs live in Testing (first real closed-app alert, offline round-trip, push after a quiet week).
+
 ## Open questions / backlog
 - Confirm the OrientationMap KV budget against **metered** Cloudflare analytics (the budget is currently a computed estimate; the incident is the only ground-truth data point).
 - Tombstone TTL (60 days, baby deletes) vs a device offline > 60 days — untested resurrection edge case (KB §9).
