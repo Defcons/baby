@@ -326,12 +326,19 @@
   .tldot.pump { background: #5f8fbf; }
   .tldot.health { background: #bf7d5f; }
   .tldot.bath { background: #6aa7c8; }
-  /* multi-day (3d/7d) rows: one day per row, clock-aligned for pattern reading */
+  /* multi-day (3d/7d) rows: one day per row, clock-aligned for pattern reading.
+     Two bands per row — sleep on top, feeds/events below — plus type chips. */
   .tldaylab { font-size: 9px; color: var(--subtle); width: 30px; flex: none; text-transform: uppercase; letter-spacing: 0.02em; }
-  .tltrack.tall { height: 16px; }
-  .tlbar.inset { top: 4px; bottom: 4px; }
+  .tltrack.tall { height: 18px; }
+  .tltrack.tall .tlbar { border-radius: 2px; }
+  .tltrack.tall .tlbar.dtop { top: 2px; bottom: 9px; }
+  .tltrack.tall .tlbar.dbot { top: 11px; bottom: 2px; }
+  .tltrack.tall .tldot { top: 72%; width: 5px; height: 5px; }
   .tlnowline { position: absolute; top: -1px; bottom: -1px; width: 2px; background: var(--go-text); border-radius: 1px; }
   .tlaxis.days { margin-left: 38px; }
+  .tldayfilter { display: flex; gap: 4px; margin: 0 0 8px 38px; flex-wrap: wrap; }
+  .tldayfilter button { padding: 3px 7px; font-size: 12px; line-height: 1; border-radius: 7px; cursor: pointer; border: 1px solid var(--border); background: var(--bg); opacity: .4; }
+  .tldayfilter button.sel { opacity: 1; background: var(--card); border-color: var(--accent2); }
 
   /* daily history table */
   .hist { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 6px 12px; font-size: 13px; }
@@ -1410,6 +1417,13 @@
   });
   paintTlSpan();
 
+  // days-view type filter: multi-select chips, per-device preference
+  const TL_DAYTYPES_KEY = 'btTlDayTypes_v1';
+  let tlDayTypes = (function(){
+    try { const v = JSON.parse(localStorage.getItem(TL_DAYTYPES_KEY) || '0'); if (Array.isArray(v)) return new Set(v); } catch(e) {}
+    return new Set(['sleep', 'nurse', 'bottle']);
+  })();
+
   const ICO_DIAPER = '<svg class="svgico"><use href="#icoDiaper"/></svg>';
   const ICO_PUMP = '<svg class="svgico"><use href="#icoPump"/></svg>';
   const TL_TYPES = [
@@ -1446,10 +1460,12 @@
     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const tickHtml = [25, 50, 75].map(p => `<span class="tltick" style="left:${p}%"></span>`).join('');
     const durs = [];
-    for (const e of entries) if ((e.type === 'sleep' || e.type === 'nurse') && e.end) durs.push(e);
-    for (const k of ['sleep', 'nurse']) if (active[k]) durs.push({ type: k, start: active[k].start, end: now, live: true });
-    const dots = entries.filter((e) => e.type === 'bottle');
-    let html = '<div class="tlbody">';
+    for (const e of entries) if ((e.type === 'sleep' || e.type === 'nurse') && e.end && tlDayTypes.has(e.type)) durs.push(e);
+    for (const k of ['sleep', 'nurse']) if (active[k] && tlDayTypes.has(k)) durs.push({ type: k, start: active[k].start, end: now, live: true });
+    const dots = entries.filter((e) => e.type !== 'sleep' && e.type !== 'nurse' && tlDayTypes.has(e.type));
+    let html = '<div class="tldayfilter">' + TL_TYPES.map((t) =>
+      `<button data-t="${t.type}" class="${tlDayTypes.has(t.type) ? 'sel' : ''}" title="${t.type}">${t.ico}</button>`).join('') + '</div>';
+    html += '<div class="tlbody">';
     for (let i = 0; i < days; i++) {
       const start = d0.getTime() - i * DAY, end = start + DAY;
       const pct = (t) => Math.max(0, Math.min(100, (t - start) / DAY * 100));
@@ -1457,11 +1473,11 @@
       for (const e of durs) {
         if (e.end <= start || e.start >= end) continue;
         const l = pct(e.start), r = pct(e.end);
-        evs += `<span class="tlbar ${e.type}${e.type === 'nurse' ? ' inset' : ''}${e.live ? ' live' : ''}" style="left:${l}%;width:${Math.max(r - l, 0.5)}%"></span>`;
+        evs += `<span class="tlbar ${e.type} ${e.type === 'sleep' ? 'dtop' : 'dbot'}${e.live ? ' live' : ''}" style="left:${l}%;width:${Math.max(r - l, 0.5)}%"></span>`;
       }
       for (const e of dots) {
         if (e.start < start || e.start >= end) continue;
-        evs += `<span class="tldot bottle" style="left:${pct(e.start)}%"></span>`;
+        evs += `<span class="tldot ${e.type}" style="left:${pct(e.start)}%"></span>`;
       }
       if (i === 0) evs += `<span class="tlnowline" style="left:${pct(now)}%"></span>`;
       const dt = new Date(start);
@@ -1545,6 +1561,14 @@
     tlCursor = Math.max(0, Math.min(1, (clientX - r.left) / r.width));
     paintTlCursor();
   }
+  timelineEl.addEventListener('click', (e) => {
+    const b = e.target.closest('.tldayfilter button');
+    if (!b) return;
+    const t = b.dataset.t;
+    if (tlDayTypes.has(t)) tlDayTypes.delete(t); else tlDayTypes.add(t);
+    try { localStorage.setItem(TL_DAYTYPES_KEY, JSON.stringify([...tlDayTypes])); } catch(err) {}
+    renderTimeline();
+  });
   timelineEl.addEventListener('pointerdown', (e) => {
     if (tlSpan > 24) return; // day-rows mode has no scrubber
     if (e.target.closest('.tlbubble')) { tlCursor = null; paintTlCursor(); return; }

@@ -19,5 +19,5 @@ _Updated 2026-08-08 (post-cutover). Graduated as CONFIRMED: #3 firewall probes, 
 **Pass:** a device that hasn't opened the app for >1 week still receives an alert push (proves `ensurePush` re-registration + endpoint stability against the new VAPID keys).
 
 ## 7. Multi-day timeline (3d/7d) on the phones
-**Steps:** baby tracker → timeline card → tap `3d`, then `7d`; find an evening cluster-feeding stretch and compare it across days; toggle back to `24h`.
-**Pass:** one row per day with hours aligned (evening feeds stack visually), today carries the now-marker, bars/dots match the log, and the 24h view + drag scrubber behave exactly as before. (DOM-verified locally with seeded data, 2026-08-08 — phone look-and-feel is what's pending.)
+**Steps:** baby tracker → timeline card → tap `3d`, then `7d`; toggle the diaper chip on and off; find an evening cluster-feeding stretch and compare it across days; toggle back to `24h`.
+**Pass:** one row per day with hours aligned (sleep band on top, feeds below — evening feeds stack visually), type chips add/remove their marks and the choice sticks, today carries the now-marker, and the 24h view + drag scrubber behave exactly as before. (DOM-verified locally with dense seeded data incl. chip toggling, 2026-08-08 — phone look-and-feel is what's pending.)
