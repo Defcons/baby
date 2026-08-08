@@ -1,0 +1,2732 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Baby Tracker</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#14110f">
+<meta name="application-name" content="Baby Tracker">
+<meta name="apple-mobile-web-app-title" content="Baby Tracker">
+<style>
+  :root {
+    --bg: #14110f;
+    --card: #1e1a17;
+    --border: #2c2621;
+    --border2: #241f1b;
+    --text: #f0ece6;
+    --muted: #8a827a;
+    --subtle: #6b635b;
+    --soft: #c9c1b8;
+    --accent: #4f7ea8;
+    --accent2: #3a6488;
+    --ok: #6f9a6f;
+    --warn: #b08a4f;
+    --go-text: #ff9d8a;
+  }
+  html[data-theme="light"] {
+    --bg: #f4f7f9;
+    --card: #ffffff;
+    --border: #dde6ec;
+    --border2: #e8eef2;
+    --text: #2b3238;
+    --muted: #7c8a94;
+    --subtle: #a3b0b8;
+    --soft: #4d5960;
+    --accent: #3d7bab;
+    --accent2: #2f628a;
+    --ok: #4c7d4c;
+    --warn: #9a7433;
+    --go-text: #a03a26;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  .svgico { width: 1em; height: 1em; vertical-align: -0.12em; display: inline-block; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 20px 16px 40px;
+    max-width: 560px;
+    margin: 0 auto;
+    transition: background 0.25s, color 0.25s;
+  }
+  .top { display: flex; align-items: flex-start; justify-content: space-between; }
+  h1 { font-size: 20px; font-weight: 600; margin-bottom: 4px; letter-spacing: -0.01em; }
+  h1 .agechip { font-size: 13px; font-weight: 400; color: var(--muted); }
+  .sub { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+  .topbtns { display: flex; gap: 8px; }
+  .themebtn, .navlink {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-size: 16px;
+    padding: 7px 10px;
+    cursor: pointer;
+    line-height: 1;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    color: var(--text);
+  }
+
+  .stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+  .stat {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px;
+  }
+  .stat .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 5px; }
+  .stat .value { font-size: 19px; font-weight: 600; }
+  .stat .value.active { color: var(--accent); }
+  /* age-aware urgency: gap approaching / past the age-appropriate limit */
+  .stat .value.warn, .actionbtn .sub2.warn { color: var(--warn); font-weight: 600; }
+  .stat .value.late, .actionbtn .sub2.late { color: var(--go-text); font-weight: 600; }
+
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 10px; margin-top: 22px; }
+
+  .actiongrid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  .actionbtn {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 16px 10px;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+    cursor: pointer;
+    text-align: center;
+    transition: transform 0.08s, background 0.15s, border-color 0.15s;
+  }
+  .actionbtn:active { transform: scale(0.98); }
+  .actionbtn .ico { font-size: 24px; display: block; margin-bottom: 4px; }
+  .actionbtn .sub2 { display: block; font-size: 11px; font-weight: 400; color: var(--muted); margin-top: 2px; }
+  .actionbtn.running { background: var(--accent); border-color: var(--accent2); color: #fff; animation: pulse 1.4s infinite; }
+  .actionbtn.running .sub2 { color: rgba(255,255,255,0.85); }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.85; } }
+  .actionbtn.wide { grid-column: 1 / -1; }
+
+  .sidepick { display: flex; gap: 6px; margin: -2px 0 10px; }
+  .sidepick button {
+    flex: 1; padding: 8px; font-size: 12px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--card); color: var(--soft); cursor: pointer;
+  }
+  .sidepick button.sel { background: var(--accent); border-color: var(--accent2); color: #fff; font-weight: 600; }
+
+  .log { list-style: none; }
+  .log li {
+    display: grid;
+    grid-template-columns: auto 1fr auto auto;
+    gap: 10px;
+    align-items: center;
+    padding: 9px 4px;
+    border-bottom: 1px solid var(--border2);
+    font-size: 14px;
+  }
+  .log li .ico { font-size: 18px; }
+  .log li .main { display: flex; flex-direction: column; }
+  .log li .type { color: var(--text); font-weight: 500; }
+  .log li .detail { color: var(--muted); font-size: 12px; }
+  .log li .time { color: var(--soft); font-size: 13px; text-align: right; white-space: nowrap; }
+  .log li .note { grid-column: 1 / -1; font-size: 12px; color: var(--muted); font-style: italic; padding: 0 4px 2px 28px; margin-top: -4px; }
+  .rowacts { display: flex; gap: 0; }
+  .rowbtn {
+    background: none;
+    border: none;
+    color: var(--subtle);
+    font-size: 15px;
+    padding: 8px 6px;
+    cursor: pointer;
+    line-height: 1;
+  }
+  .rowbtn:active { color: var(--text); }
+  .empty { color: var(--subtle); font-size: 14px; padding: 8px 4px; }
+
+  /* log filter chips + collapsible day sections */
+  .loghead { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 22px; margin-bottom: 10px; }
+  .loghead h2 { margin: 0; }
+  .expandall {
+    padding: 4px 9px; font-size: 11px; border-radius: 7px; cursor: pointer;
+    border: 1px solid var(--border); background: var(--card); color: var(--soft);
+  }
+  .logfilter { display: flex; gap: 5px; flex-wrap: wrap; margin: -2px 0 8px; }
+  .logfilter button {
+    padding: 5px 10px; font-size: 13px; border-radius: 8px; cursor: pointer; line-height: 1.2;
+    border: 1px solid var(--border); background: var(--card); color: var(--soft);
+  }
+  .logfilter button.sel { background: var(--accent); border-color: var(--accent2); color: #fff; font-weight: 600; }
+  .log li.dayhead {
+    display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+    cursor: pointer; user-select: none; -webkit-user-select: none;
+    color: var(--soft); font-size: 13px; font-weight: 600; padding: 10px 4px;
+  }
+  .log li.dayhead .arr { color: var(--subtle); font-size: 10px; margin-right: 6px; }
+  .log li.dayhead .daysum { color: var(--muted); font-weight: 400; font-size: 12px; text-align: right; }
+
+  .overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.55);
+    display: none;
+    align-items: center; justify-content: center;
+    z-index: 10; padding: 16px;
+  }
+  .overlay.open { display: flex; }
+  .modal {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px;
+    width: 100%; max-width: 340px;
+    max-height: 88vh;
+    overflow-y: auto;
+  }
+  .modal h3 { font-size: 15px; font-weight: 600; margin-bottom: 14px; }
+  .field { margin-bottom: 12px; }
+  .field label { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 5px; }
+  .field input, .field select {
+    width: 100%; padding: 10px; font-size: 16px;
+    border-radius: 10px; border: 1px solid var(--border);
+    background: var(--bg); color: var(--text);
+  }
+  .field .row2 { display: flex; gap: 8px; }
+  .field .row2 > * { flex: 1; }
+  .choicebtns { display: flex; gap: 8px; }
+  .choicebtns button {
+    flex: 1; padding: 12px 6px; font-size: 13px; font-weight: 600;
+    border-radius: 10px; border: 1px solid var(--border);
+    background: var(--bg); color: var(--soft); cursor: pointer;
+  }
+  .choicebtns button.sel { background: var(--accent); border-color: var(--accent2); color: #fff; }
+  .modal .err { color: var(--go-text); font-size: 12px; margin-top: 2px; display: none; }
+  .modal .btns { display: flex; gap: 10px; margin-top: 16px; }
+  .modal .btns button {
+    flex: 1; padding: 12px; font-size: 14px;
+    border-radius: 10px; border: 1px solid var(--border);
+    background: var(--card); color: var(--soft); cursor: pointer;
+  }
+  .modal .btns button.primary { background: var(--accent); border-color: transparent; color: #fff; font-weight: 600; }
+  .saved-note { font-size: 11px; color: var(--subtle); text-align: center; margin-top: 18px; }
+  .saved-note.ok { color: var(--ok); }
+  .saved-note.warn { color: var(--warn); }
+
+  /* login gate */
+  #loginOverlay { background: var(--bg); z-index: 20; }
+
+  /* ringing alarm overlay */
+  #alarmOverlay { z-index: 30; background: rgba(120, 20, 20, 0.6); }
+  .alarmbox {
+    background: var(--card); border: 2px solid var(--go-text); border-radius: 20px;
+    padding: 28px 24px; width: 100%; max-width: 340px; text-align: center;
+    animation: alarmpulse 1s infinite;
+  }
+  @keyframes alarmpulse { 0%,100% { box-shadow: 0 0 0 0 rgba(255,90,60,0.5); } 50% { box-shadow: 0 0 0 14px rgba(255,90,60,0); } }
+  .alarmbox .alarmico { font-size: 44px; margin-bottom: 10px; }
+  .alarmbox #alarmMsgs { font-size: 17px; font-weight: 600; line-height: 1.5; margin-bottom: 20px; }
+  .alarmbox button {
+    width: 100%; padding: 15px; font-size: 16px; font-weight: 700; cursor: pointer;
+    border-radius: 12px; border: none; background: var(--go-text); color: #fff;
+  }
+
+  /* alerts modal */
+  .alertrow { display: flex; align-items: center; gap: 6px; padding: 7px 0; font-size: 13px; }
+  .alertrow span { flex: 1; }
+  .alertrow input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent); }
+  .alertrow select {
+    width: 74px; padding: 8px 4px; font-size: 13px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--bg); color: var(--text);
+  }
+  .pushstatus { font-size: 12px; color: var(--muted); line-height: 1.5; }
+  .pushstatus.ok { color: var(--ok); }
+  .pushstatus.warn { color: var(--warn); }
+
+  /* start-timer button inside nurse/sleep modals */
+  .modalstart {
+    width: 100%; padding: 13px; font-size: 14px; font-weight: 600;
+    border-radius: 10px; border: 1px solid var(--accent2);
+    background: var(--accent); color: #fff; cursor: pointer;
+  }
+  .ordivider {
+    text-align: center; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--subtle); margin: 14px 0 6px;
+  }
+
+  /* scroll-wheel picker */
+  .wheelrow { display: flex; justify-content: center; gap: 18px; margin: 6px 0 2px; }
+  .wheelcol { text-align: center; }
+  .wheel {
+    height: 132px; width: 72px; overflow-y: scroll; scroll-snap-type: y mandatory;
+    border: 1px solid var(--border); border-radius: 12px; background: var(--bg);
+    scrollbar-width: none;
+    -webkit-mask-image: linear-gradient(transparent, #000 28%, #000 72%, transparent);
+    mask-image: linear-gradient(transparent, #000 28%, #000 72%, transparent);
+  }
+  .wheel::-webkit-scrollbar { display: none; }
+  .wheel .pad { height: 44px; }
+  .wheel .wv {
+    height: 44px; line-height: 44px; text-align: center; scroll-snap-align: center;
+    font-size: 20px; color: var(--subtle); font-variant-numeric: tabular-nums;
+  }
+  .wheel .wv.sel { color: var(--text); font-weight: 600; }
+  .wheellabel { font-size: 11px; color: var(--muted); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.05em; }
+
+  /* activity timeline (span picked via 6h/12h/24h toggle) */
+  .tlhead { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 22px; margin-bottom: 10px; }
+  .tlhead h2 { margin: 0; }
+  .tlspans { display: flex; gap: 4px; }
+  .tlspans button {
+    padding: 4px 9px; font-size: 11px; border-radius: 7px; cursor: pointer;
+    border: 1px solid var(--border); background: var(--card); color: var(--soft);
+  }
+  .tlspans button.sel { background: var(--accent); border-color: var(--accent2); color: #fff; font-weight: 600; }
+  .tl {
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 10px 12px 8px;
+    touch-action: pan-y; user-select: none; -webkit-user-select: none;
+  }
+  .tlrow { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .tlico { font-size: 13px; width: 18px; text-align: center; flex: none; }
+  .tltrack { position: relative; flex: 1; height: 14px; background: var(--bg); border-radius: 4px; overflow: hidden; }
+  .tlbar { position: absolute; top: 2px; bottom: 2px; border-radius: 3px; display: flex; align-items: center; justify-content: center; }
+  .tlbar.live { animation: pulse 1.4s infinite; }
+  .tlside { font-size: 8px; font-weight: 700; color: #fff; line-height: 1; }
+  .tldot { position: absolute; top: 50%; width: 7px; height: 7px; border-radius: 50%; transform: translate(-50%,-50%); }
+  .tlem { position: absolute; top: 50%; transform: translate(-50%,-50%); font-size: 10px; line-height: 1; white-space: nowrap; }
+  .tltick { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--border2); }
+  /* time-scrubber: drag across the lanes to read an exact time */
+  .tlbody { position: relative; }
+  .tlscrub { position: absolute; top: 0; bottom: 6px; left: 26px; right: 0; }
+  .tlline { position: absolute; top: -2px; bottom: -2px; width: 2px; margin-left: -1px; background: var(--go-text); border-radius: 1px; }
+  .tlbubble {
+    position: absolute; top: -6px; transform: translate(-50%,-100%);
+    background: var(--card); border: 1px solid var(--border); border-radius: 7px;
+    padding: 3px 8px; font-size: 11px; white-space: nowrap; color: var(--text);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3); cursor: pointer;
+  }
+  .tlaxis { position: relative; height: 14px; margin: 3px 0 0 26px; font-size: 10px; color: var(--subtle); }
+  .tlaxis span { position: absolute; transform: translateX(-50%); }
+  .tlaxis span.edgeL { transform: none; }
+  .tlaxis .tlnow { left: auto; right: 0; transform: none; }
+  .tlbar.sleep, .tldot.sleep { background: var(--accent); }
+  .tlbar.nurse, .tldot.nurse { background: #c76e9d; }
+  .tlbar.bottle, .tldot.bottle { background: var(--warn); }
+  .tldot.diaper { background: #55a0a0; }
+  .tldot.solid { background: var(--ok); }
+  .tldot.med { background: #9a6fc0; }
+  .tldot.pump { background: #5f8fbf; }
+  .tldot.health { background: #bf7d5f; }
+  .tldot.bath { background: #6aa7c8; }
+
+  /* daily history table */
+  .hist { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 6px 12px; font-size: 13px; }
+  .histrow { display: grid; grid-template-columns: 1.2fr 1fr 1fr 1fr 1fr; gap: 6px; padding: 7px 0; border-bottom: 1px solid var(--border2); align-items: baseline; }
+  .histrow:last-child { border-bottom: none; }
+  .histrow.head { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .histrow .day { color: var(--soft); }
+  .histrow .histsub { color: var(--muted); font-size: 11px; }
+  .histrow.avg {
+    font-weight: 600;
+    background: color-mix(in srgb, var(--accent) 16%, transparent);
+    border-radius: 8px;
+    border-bottom: none;
+    margin: 4px -6px;
+    padding: 8px 6px;
+  }
+  .histrow.avg .day { color: var(--accent); }
+  .histmore { text-align: center; padding: 8px 0 4px; }
+  .histmore button {
+    padding: 7px 16px; font-size: 12px; border-radius: 8px; cursor: pointer;
+    border: 1px solid var(--border); background: var(--card); color: var(--soft);
+  }
+  .histbtns { display: flex; justify-content: flex-end; margin-top: 8px; }
+  .histbtns button {
+    padding: 8px 14px; font-size: 12px; border-radius: 8px; cursor: pointer;
+    border: 1px solid var(--border); background: var(--card); color: var(--soft);
+  }
+  .showmore { text-align: center; padding: 10px 0 2px; }
+  .showmore button {
+    padding: 8px 18px; font-size: 12px; border-radius: 8px; cursor: pointer;
+    border: 1px solid var(--border); background: var(--card); color: var(--soft);
+  }
+
+  /* weight-for-age growth chart (WHO Child Growth Standards, girls/boys 0–6 mo) */
+  .growth { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 12px; }
+  .gchart { display: block; width: 100%; height: auto; }
+  .gband-out { fill: var(--accent); fill-opacity: 0.09; }
+  .gband-in  { fill: var(--accent); fill-opacity: 0.18; }
+  .gline { fill: none; stroke: var(--accent); stroke-opacity: 0.4; stroke-width: 1; }
+  .gmed  { fill: none; stroke: var(--accent); stroke-width: 1.6; }
+  .ggrid { stroke: var(--border2); stroke-width: 1; }
+  .gbaby { fill: none; stroke: #c76e9d; stroke-width: 1.8; stroke-linejoin: round; stroke-linecap: round; }
+  .gdot  { fill: #c76e9d; stroke: var(--card); stroke-width: 1; }
+  .glabel  { fill: var(--muted); font-size: 9px; }
+  .gplabel { fill: var(--subtle); font-size: 8px; }
+  .gcap { font-size: 11px; color: var(--muted); margin-top: 10px; line-height: 1.5; }
+  .gcap b { color: #c76e9d; }
+  .ghint { font-size: 13px; color: var(--muted); line-height: 1.7; padding: 16px 6px; text-align: center; }
+  .glink { background: none; border: none; color: var(--accent); font: inherit; cursor: pointer; padding: 0; text-decoration: underline; }
+  .gmore { text-align: center; padding: 10px 0 2px; }
+  .gmore button { padding: 7px 16px; font-size: 12px; border-radius: 8px; cursor: pointer; border: 1px solid var(--border); background: var(--card); color: var(--soft); }
+
+  /* quick mode: hide everything but the action buttons, make them big */
+  body.quick .fullonly { display: none; }
+  body.quick .actionbtn { padding: 28px 12px; font-size: 17px; border-radius: 20px; }
+  body.quick .actionbtn .ico { font-size: 36px; margin-bottom: 8px; }
+  body.quick .actionbtn .sub2 { font-size: 13px; margin-top: 4px; }
+
+  /* landscape / wide screens (tablets): two columns — actions left, data right */
+  @media (min-width: 760px) {
+    body { max-width: 1200px; padding: 20px 24px 40px; }
+    .cols { display: grid; grid-template-columns: minmax(320px, 5fr) 6fr; gap: 28px; align-items: start; }
+    .datacol .tlhead { margin-top: 0; }
+    body.quick .cols { display: block; max-width: 720px; margin: 0 auto; }
+    body.quick .actiongrid { grid-template-columns: repeat(4, 1fr); }
+    body.quick .actionbtn { padding: 34px 12px; }
+  }
+</style>
+<script>document.documentElement.dataset.theme = (function(){ try { return localStorage.getItem('btTheme') || 'dark'; } catch(e) { return 'dark'; } })();</script>
+</head>
+<body>
+  <!-- custom icons (no Unicode emoji exists for diaper / breast pump) -->
+  <svg style="display:none" xmlns="http://www.w3.org/2000/svg">
+    <symbol id="icoDiaper" viewBox="0 0 24 24">
+      <path d="M5 5.5h14c1 0 1.8.8 1.7 1.8l-.3 3.2c-.5 5.3-4.1 8.8-8.4 8.8s-7.9-3.5-8.4-8.8l-.3-3.2C3.2 6.3 4 5.5 5 5.5z" fill="#f6f0e4" stroke="#8f8578" stroke-width="1.3"/>
+      <path d="M4.4 9.2h15.2" stroke="#8f8578" stroke-width="1" opacity=".55"/>
+      <rect x="4" y="5.7" width="3.6" height="2.3" rx=".7" fill="#6fa8cc"/>
+      <rect x="16.4" y="5.7" width="3.6" height="2.3" rx=".7" fill="#6fa8cc"/>
+    </symbol>
+    <symbol id="icoPump" viewBox="0 0 24 24">
+      <path d="M6.6 2h10.8l-3.1 5.3h-4.6z" fill="#bcd4e4" stroke="#7a8b98" stroke-width="1.2" stroke-linejoin="round"/>
+      <rect x="9.4" y="7.2" width="5.2" height="1.8" rx=".5" fill="#bcd4e4" stroke="#7a8b98" stroke-width="1"/>
+      <path d="M8.6 8.9h6.8l-.5 10.9a1.4 1.4 0 0 1-1.4 1.3h-3a1.4 1.4 0 0 1-1.4-1.3z" fill="#fdfaf3" stroke="#7a8b98" stroke-width="1.2"/>
+      <path d="M8.9 14.4h6.2l-.28 5.4c-.04.6-.55 1.1-1.15 1.1h-3.34c-.6 0-1.11-.5-1.15-1.1z" fill="#eedfbd"/>
+      <path d="M14.9 11h-1.7M14.8 12.9h-1.6" stroke="#7a8b98" stroke-width=".9" opacity=".7"/>
+    </symbol>
+  </svg>
+
+  <div class="top">
+    <div>
+      <h1>Baby Tracker</h1>
+    </div>
+    <div class="topbtns">
+      <a class="navlink" href="../contraction-tracker/" title="Contraction timer">⏱️</a>
+      <a class="navlink" href="../pelvic-trainer/" title="Pelvic trainer">🌸</a>
+      <button class="themebtn" id="modeBtn" aria-label="Toggle quick buttons view">⚡</button>
+      <button class="themebtn" id="alertsBtn" aria-label="Alerts &amp; notifications">🔔</button>
+      <button class="themebtn" id="themeBtn" aria-label="Toggle light/dark">☀️</button>
+    </div>
+  </div>
+  <div class="sub fullonly">Tap to log feeds, diapers &amp; sleep.</div>
+
+  <div class="cols">
+  <div>
+  <div class="stats fullonly">
+    <div class="stat">
+      <div class="label">Since last feed</div>
+      <div class="value" id="sinceFeed">—</div>
+    </div>
+    <div class="stat">
+      <div class="label">Since last diaper</div>
+      <div class="value" id="sinceDiaper">—</div>
+    </div>
+    <div class="stat">
+      <div class="label" id="sleepLabel">Sleep</div>
+      <div class="value" id="sleepVal">—</div>
+    </div>
+    <div class="stat">
+      <div class="label">Today</div>
+      <div class="value" id="todaySummary">0 feeds · 0 diapers</div>
+    </div>
+  </div>
+
+  <h2 class="fullonly">Log activity</h2>
+  <div class="actiongrid">
+    <button class="actionbtn" id="sleepBtn">
+      <span class="ico">😴</span>Sleep
+      <span class="sub2" id="sleepBtnSub">Tap to start</span>
+    </button>
+    <button class="actionbtn" id="nurseBtn">
+      <span class="ico">🤱</span>Nurse
+      <span class="sub2" id="nurseBtnSub">Tap to start</span>
+    </button>
+    <button class="actionbtn" id="bottleBtn">
+      <span class="ico">🍼</span>Bottle
+      <span class="sub2" id="bottleBtnSub">Amount &amp; type</span>
+    </button>
+    <button class="actionbtn" id="diaperBtn">
+      <span class="ico"><svg class="svgico"><use href="#icoDiaper"/></svg></span>Diaper
+      <span class="sub2" id="diaperBtnSub">Wet / dirty</span>
+    </button>
+    <button class="actionbtn" id="pumpBtn">
+      <span class="ico"><svg class="svgico"><use href="#icoPump"/></svg></span>Pump
+      <span class="sub2" id="pumpBtnSub">Amount &amp; side</span>
+    </button>
+    <button class="actionbtn" id="solidBtn">
+      <span class="ico">🥄</span>Solids
+      <span class="sub2" id="solidBtnSub">What &amp; when</span>
+    </button>
+    <button class="actionbtn" id="medBtn">
+      <span class="ico">💊</span>Meds
+      <span class="sub2" id="medBtnSub">Vitamins etc.</span>
+    </button>
+    <button class="actionbtn" id="healthBtn">
+      <span class="ico">🌡️</span>Health
+      <span class="sub2" id="healthBtnSub">Temp / growth</span>
+    </button>
+    <button class="actionbtn wide" id="bathBtn">
+      <span class="ico">🛁</span>Bath
+      <span class="sub2" id="bathBtnSub">Splish splash</span>
+    </button>
+  </div>
+  <div class="sidepick" id="nurseSidePick" style="display:none;">
+    <button data-side="L">Left</button>
+    <button data-side="R">Right</button>
+    <button data-side="both">Both</button>
+  </div>
+  <!-- Weight chart: in the left column so on 2-column (tablet/desktop) it sits
+       right under the action buttons; on phone it stacks here too -->
+  <div class="tlhead fullonly" style="margin-top:22px;"><h2>Weight</h2></div>
+  <div class="growth fullonly" id="growth"></div>
+  </div>
+
+  <div class="datacol fullonly">
+  <div class="tlhead">
+    <h2 id="tlTitle">Last 24 hours</h2>
+    <div class="tlspans" id="tlSpans">
+      <button data-h="6">6h</button>
+      <button data-h="12">12h</button>
+      <button data-h="24">24h</button>
+    </div>
+  </div>
+  <div class="tl" id="timeline"></div>
+
+  <div class="loghead">
+    <h2>Log</h2>
+    <button id="expandAllBtn" class="expandall">Expand all</button>
+  </div>
+  <div class="logfilter" id="logFilterRow">
+    <button data-t="" class="sel">All</button>
+    <button data-t="sleep" title="Sleep">😴</button>
+    <button data-t="nurse" title="Nurse">🤱</button>
+    <button data-t="bottle" title="Bottle">🍼</button>
+    <button data-t="pump" title="Pump"><svg class="svgico"><use href="#icoPump"/></svg></button>
+    <button data-t="diaper" title="Diaper"><svg class="svgico"><use href="#icoDiaper"/></svg></button>
+    <button data-t="solid" title="Solids">🥄</button>
+    <button data-t="med" title="Medicine">💊</button>
+    <button data-t="health" title="Health">🌡️</button>
+    <button data-t="bath" title="Bath">🛁</button>
+  </div>
+  <ul class="log" id="logList">
+    <li class="empty">Nothing logged yet.</li>
+  </ul>
+
+  <div class="tlhead">
+    <h2>Daily history</h2>
+    <div class="tlspans" id="avgSpans">
+      <button data-d="7">7d</button>
+      <button data-d="14">14d</button>
+      <button data-d="30">1m</button>
+    </div>
+  </div>
+  <div class="hist" id="history"></div>
+  <div class="histbtns"><button id="csvBtn">Export CSV</button></div>
+  </div>
+  </div>
+
+  <div class="saved-note" id="syncNote">Saved automatically to this device.</div>
+
+  <!-- Login gate -->
+  <div class="overlay" id="loginOverlay">
+    <div class="modal">
+      <h3>Sign in</h3>
+      <div class="field">
+        <label for="loginPass">Password</label>
+        <input type="password" id="loginPass" autocomplete="current-password">
+      </div>
+      <div class="field">
+        <label for="loginBaby">Baby name (only for a 2nd+ baby)</label>
+        <input type="text" id="loginBaby" maxlength="20" placeholder="Leave empty for your first baby">
+      </div>
+      <div class="err" id="loginErr"></div>
+      <div class="btns">
+        <button class="primary" id="loginBtn">Sign in</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Alerts & notifications modal -->
+  <div class="overlay" id="alertsOverlay">
+    <div class="modal">
+      <h3>Alerts &amp; notifications</h3>
+      <div class="field">
+        <label>Baby (shared between devices)</label>
+        <input type="text" id="babyName" maxlength="20" placeholder="Name" style="margin-bottom:8px;">
+        <div class="row2">
+          <input type="date" id="babyBorn">
+          <select id="babySex" aria-label="Baby sex (for the WHO weight chart)">
+            <option value="">Sex…</option>
+            <option value="girl">Girl</option>
+            <option value="boy">Boy</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label>This device</label>
+        <input type="text" id="deviceName" maxlength="16" placeholder="Who logs from here? e.g. Grandma" style="margin-bottom:8px;">
+        <div class="pushstatus" id="pushStatus">Checking…</div>
+        <div class="btns" style="margin-top:10px;">
+          <button class="primary" id="pushToggle">Enable notifications</button>
+          <button id="pushTest" style="display:none;">Send test</button>
+        </div>
+      </div>
+      <div class="field" style="margin-top:16px;">
+        <label>Remind this device when</label>
+        <div class="alertrow"><input type="checkbox" id="alFeedOn"><span>🍼 No feed for</span><select id="alFeedMin"></select><select id="alFeedCrit" title="How loud"></select></div>
+        <div class="alertrow"><input type="checkbox" id="alDiaperOn"><span><svg class="svgico"><use href="#icoDiaper"/></svg> No diaper for</span><select id="alDiaperMin"></select><select id="alDiaperCrit" title="How loud"></select></div>
+        <div class="alertrow"><input type="checkbox" id="alAwakeOn"><span>☀️ Awake for</span><select id="alAwakeMin"></select><select id="alAwakeCrit" title="How loud"></select></div>
+        <div class="alertrow"><input type="checkbox" id="alSleepOn"><span>😴 Asleep for</span><select id="alSleepMin"></select><select id="alSleepCrit" title="How loud"></select></div>
+        <div class="alertrow"><input type="checkbox" id="alQuietOn"><span>🌙 Quiet hours</span><select id="alQuietFrom"></select><select id="alQuietTo"></select></div>
+        <div class="pushstatus" style="margin-top:6px;">Quiet = silent, once. Normal = sound, repeats every 30 min. Nag = sound, repeats every 10 min until logged. Alarm = rings out loud like a timer on any device showing the app, plus the strongest push every 5 min. During quiet hours nothing is sent; pending alerts arrive when they end. If pushes stop arriving with the app closed, turn off battery optimization for your browser/app in Android settings.</div>
+        <div class="pushstatus" id="srvStatus" style="margin-top:6px;"></div>
+      </div>
+      <div class="pushstatus" style="margin-top:10px;">Integrations (Home Assistant etc.): <a href="#" id="copyRoom" style="color:var(--accent);">copy room id</a></div>
+      <div class="btns">
+        <button id="switchBaby">Switch baby / sign out</button>
+        <button id="alertsClose">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Nurse modal: start timer or log a finished nurse -->
+  <div class="overlay" id="nurseOverlay">
+    <div class="modal">
+      <h3>Nurse</h3>
+      <div class="field">
+        <label>Side</label>
+        <div class="choicebtns" id="nurseModalSide">
+          <button data-val="L">Left</button>
+          <button data-val="R">Right</button>
+          <button data-val="both">Both</button>
+        </div>
+      </div>
+      <button class="modalstart" id="nurseStartTimer">▶ Start timer</button>
+      <div class="ordivider">or already nursed for</div>
+      <div class="wheelrow">
+        <div class="wheelcol">
+          <div class="wheel" id="nurseMinWheel"></div>
+          <div class="wheellabel">min</div>
+        </div>
+      </div>
+      <div class="btns">
+        <button id="nurseCancel">Cancel</button>
+        <button class="primary" id="nurseLogSave">Nursed ✓</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sleep modal: start timer or log a finished sleep -->
+  <div class="overlay" id="sleepOverlay">
+    <div class="modal">
+      <h3>Sleep</h3>
+      <button class="modalstart" id="sleepStartTimer">▶ Start sleep</button>
+      <div class="ordivider">or already slept for</div>
+      <div class="wheelrow">
+        <div class="wheelcol">
+          <div class="wheel" id="sleepHourWheel"></div>
+          <div class="wheellabel">hours</div>
+        </div>
+        <div class="wheelcol">
+          <div class="wheel" id="sleepMinWheel"></div>
+          <div class="wheellabel">min</div>
+        </div>
+      </div>
+      <div class="err" id="sleepErr"></div>
+      <div class="btns">
+        <button id="sleepCancel">Cancel</button>
+        <button class="primary" id="sleepLogSave">Slept ✓</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottle modal -->
+  <div class="overlay" id="bottleOverlay">
+    <div class="modal">
+      <h3>Log bottle</h3>
+      <div class="field">
+        <label for="bottleTime">Time</label>
+        <input type="time" id="bottleTime" step="60">
+      </div>
+      <div class="field">
+        <label>Amount</label>
+        <div class="row2">
+          <input type="number" id="bottleAmount" inputmode="decimal" min="0" step="0.5" placeholder="120">
+          <select id="bottleUnit">
+            <option value="ml">ml</option>
+            <option value="oz">oz</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label>Type</label>
+        <div class="choicebtns" id="bottleMilkChoice">
+          <button data-val="formula">Formula</button>
+          <button data-val="breast">Breast milk</button>
+          <button data-val="mixed">Mixed</button>
+        </div>
+      </div>
+      <div class="field">
+        <label for="bottleNote">Note (optional)</label>
+        <input type="text" id="bottleNote" maxlength="120" placeholder="e.g. spit up after">
+      </div>
+      <div class="err" id="bottleErr"></div>
+      <div class="btns">
+        <button id="bottleCancel">Cancel</button>
+        <button class="primary" id="bottleSave">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Diaper modal -->
+  <div class="overlay" id="diaperOverlay">
+    <div class="modal">
+      <h3>Log diaper</h3>
+      <div class="field">
+        <label for="diaperTime">Time</label>
+        <input type="time" id="diaperTime" step="60">
+      </div>
+      <div class="field">
+        <label>Kind</label>
+        <div class="choicebtns" id="diaperKindChoice">
+          <button data-val="wet">💧 Wet</button>
+          <button data-val="dirty">💩 Dirty</button>
+          <button data-val="both">Both</button>
+        </div>
+      </div>
+      <div class="field">
+        <label for="diaperNote">Note (optional)</label>
+        <input type="text" id="diaperNote" maxlength="120" placeholder="e.g. color, rash, leak">
+      </div>
+      <div class="err" id="diaperErr"></div>
+      <div class="btns">
+        <button id="diaperCancel">Cancel</button>
+        <button class="primary" id="diaperSave">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Solid modal -->
+  <div class="overlay" id="solidOverlay">
+    <div class="modal">
+      <h3>Log solids</h3>
+      <div class="field">
+        <label for="solidTime">Time</label>
+        <input type="time" id="solidTime" step="60">
+      </div>
+      <div class="field">
+        <label for="solidFood">What did they eat?</label>
+        <input type="text" id="solidFood" maxlength="120" placeholder="e.g. pureed carrots">
+      </div>
+      <div class="err" id="solidErr"></div>
+      <div class="btns">
+        <button id="solidCancel">Cancel</button>
+        <button class="primary" id="solidSave">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pump modal -->
+  <div class="overlay" id="pumpOverlay">
+    <div class="modal">
+      <h3>Log pumping</h3>
+      <div class="field">
+        <label for="pumpTime">Time</label>
+        <input type="time" id="pumpTime" step="60">
+      </div>
+      <div class="field">
+        <label>Amount</label>
+        <div class="row2">
+          <input type="number" id="pumpAmount" inputmode="decimal" min="0" step="0.5" placeholder="80">
+          <select id="pumpUnit">
+            <option value="ml">ml</option>
+            <option value="oz">oz</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label>Side</label>
+        <div class="choicebtns" id="pumpSideChoice">
+          <button data-val="L">Left</button>
+          <button data-val="R">Right</button>
+          <button data-val="both">Both</button>
+        </div>
+      </div>
+      <div class="field">
+        <label for="pumpNote">Note (optional)</label>
+        <input type="text" id="pumpNote" maxlength="120">
+      </div>
+      <div class="err" id="pumpErr"></div>
+      <div class="btns">
+        <button id="pumpCancel">Cancel</button>
+        <button class="primary" id="pumpSave">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Meds modal -->
+  <div class="overlay" id="medOverlay">
+    <div class="modal">
+      <h3>Log medicine</h3>
+      <div class="field">
+        <label for="medTime">Time</label>
+        <input type="time" id="medTime" step="60">
+      </div>
+      <div class="field">
+        <label for="medName">What</label>
+        <input type="text" id="medName" maxlength="60" placeholder="e.g. Vitamin D drops">
+      </div>
+      <div class="field">
+        <label for="medNote">Note (optional)</label>
+        <input type="text" id="medNote" maxlength="120">
+      </div>
+      <div class="err" id="medErr"></div>
+      <div class="btns">
+        <button id="medCancel">Cancel</button>
+        <button class="primary" id="medSave">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Health modal (temperature / weight / length) -->
+  <div class="overlay" id="healthOverlay">
+    <div class="modal">
+      <h3>Log health</h3>
+      <div class="field">
+        <label for="healthTime">Time</label>
+        <input type="time" id="healthTime" step="60">
+      </div>
+      <div class="field">
+        <label>Measurements (fill any)</label>
+        <div class="row2">
+          <input type="number" id="healthTemp" inputmode="decimal" step="0.1" placeholder="°C">
+          <input type="number" id="healthWeight" inputmode="numeric" step="10" placeholder="g">
+          <input type="number" id="healthLength" inputmode="decimal" step="0.5" placeholder="cm">
+        </div>
+      </div>
+      <div class="field">
+        <label for="healthNote">Note (optional)</label>
+        <input type="text" id="healthNote" maxlength="120">
+      </div>
+      <div class="err" id="healthErr"></div>
+      <div class="btns">
+        <button id="healthCancel">Cancel</button>
+        <button class="primary" id="healthSave">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Ringing alarm (crit "alarm" rules, on devices with the app open) -->
+  <div class="overlay" id="alarmOverlay">
+    <div class="alarmbox">
+      <div class="alarmico">⏰</div>
+      <div id="alarmMsgs"></div>
+      <button id="alarmStop">Stop</button>
+    </div>
+  </div>
+
+  <!-- Bath modal -->
+  <div class="overlay" id="bathOverlay">
+    <div class="modal">
+      <h3>Log bath</h3>
+      <div class="field">
+        <label for="bathTime">Time</label>
+        <input type="time" id="bathTime" step="60">
+      </div>
+      <div class="field">
+        <label for="bathNote">Note (optional)</label>
+        <input type="text" id="bathNote" maxlength="120" placeholder="e.g. hair wash, loved it">
+      </div>
+      <div class="err" id="bathErr"></div>
+      <div class="btns">
+        <button id="bathCancel">Cancel</button>
+        <button class="primary" id="bathSave">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit modal (type-aware) -->
+  <div class="overlay" id="editOverlay">
+    <div class="modal">
+      <h3 id="editTitle">Edit entry</h3>
+      <div class="field">
+        <label for="editDate">Date</label>
+        <input type="date" id="editDate">
+      </div>
+      <div class="field">
+        <label for="editTime">Start time</label>
+        <input type="time" id="editTime" step="60">
+      </div>
+      <div class="field" id="editEndWrap">
+        <label for="editEndTime">End time</label>
+        <input type="time" id="editEndTime" step="60">
+      </div>
+      <div class="field" id="editSideWrap">
+        <label>Side</label>
+        <div class="choicebtns" id="editSideChoice">
+          <button data-val="L">Left</button>
+          <button data-val="R">Right</button>
+          <button data-val="both">Both</button>
+        </div>
+      </div>
+      <div class="field" id="editAmountWrap">
+        <label>Amount</label>
+        <div class="row2">
+          <input type="number" id="editAmount" inputmode="decimal" min="0" step="0.5">
+          <select id="editUnit">
+            <option value="ml">ml</option>
+            <option value="oz">oz</option>
+          </select>
+        </div>
+      </div>
+      <div class="field" id="editMilkWrap">
+        <label>Type</label>
+        <div class="choicebtns" id="editMilkChoice">
+          <button data-val="formula">Formula</button>
+          <button data-val="breast">Breast milk</button>
+          <button data-val="mixed">Mixed</button>
+        </div>
+      </div>
+      <div class="field" id="editKindWrap">
+        <label>Kind</label>
+        <div class="choicebtns" id="editKindChoice">
+          <button data-val="wet">💧 Wet</button>
+          <button data-val="dirty">💩 Dirty</button>
+          <button data-val="both">Both</button>
+        </div>
+      </div>
+      <div class="field" id="editFoodWrap">
+        <label for="editFood">What did they eat?</label>
+        <input type="text" id="editFood" maxlength="120">
+      </div>
+      <div class="field" id="editMedWrap">
+        <label for="editMedName">What</label>
+        <input type="text" id="editMedName" maxlength="60">
+      </div>
+      <div class="field" id="editHealthWrap">
+        <label>Measurements (°C / g / cm)</label>
+        <div class="row2">
+          <input type="number" id="editHealthTemp" inputmode="decimal" step="0.1" placeholder="°C">
+          <input type="number" id="editHealthWeight" inputmode="numeric" step="10" placeholder="g">
+          <input type="number" id="editHealthLength" inputmode="decimal" step="0.5" placeholder="cm">
+        </div>
+      </div>
+      <div class="field">
+        <label for="editNote">Note (optional)</label>
+        <input type="text" id="editNote" maxlength="120">
+      </div>
+      <div class="err" id="editErr"></div>
+      <div class="btns">
+        <button id="editCancel">Cancel</button>
+        <button class="primary" id="editSave">Save</button>
+      </div>
+    </div>
+  </div>
+
+<script src="sync.js"></script>
+<script>
+  const STORAGE_KEY = 'babyLog_v1';
+  const AUTH_KEY = 'babyAuthRoom_v1';
+  // sha256 of the shared password; the sync room id is derived from the password itself,
+  // so it never appears in this (public) repo
+  const PASS_SHA256 = '766724e2275657b656fcc8f94ecacadff3a798689303c5aa4d0e579ced7066b9';
+  // Self-hosted origins use the same-origin API (and afford a snappier poll —
+  // no KV quotas there); the GitHub Pages deployment keeps talking to the
+  // legacy Cloudflare Worker until it is retired.
+  const SELF_HOSTED = !/\.github\.io$/i.test(location.hostname);
+  const SYNC_URL = SELF_HOSTED ? '/api/baby' : 'https://baby-tracker-sync.davidsen908.workers.dev';
+  const POLL_MS = SELF_HOSTED ? 3000 : 10000; // Pages must stay well inside Workers/KV free-tier daily quotas
+  const NAME_KEY = 'btDeviceName_v1'; // per-device "who logs from here"
+  const VAPID_PUBLIC = 'BEhnWFpfkQFW6KpxWhLtJOhj6I8TH4O0Nf9YuS4Ai-cHY0Q5BLB0YYhxyZECd0c6TNQuBhoze8BqXjTuAO3QAWY'; // legacy CF-worker key — github.io only (self-hosted fetches /vapid)
+  // Cutover switch (server/DEPLOY.md): flip to true once the family has moved,
+  // so stale github.io bookmarks/PWA icons can't silently diverge.
+  const MOVED_BANNER = false;
+  if (MOVED_BANNER && !SELF_HOSTED) {
+    const b = document.createElement('div');
+    b.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#b33226;color:#fff;text-align:center;padding:10px 14px;font-size:14px;';
+    b.innerHTML = 'This app has moved to <a href="https://baby.defc0n.no/baby-tracker/" style="color:#fff;font-weight:700;">baby.defc0n.no</a> — this copy no longer syncs.';
+    document.body.appendChild(b);
+  }
+  const PUSH_FLAG = 'btPushOn_v1'; // per-device: user enabled notifications here
+
+  function defaultAlerts() {
+    return {
+      feed:   { on: false, min: 180, crit: 'normal' },
+      diaper: { on: false, min: 240, crit: 'normal' },
+      awake:  { on: false, min: 120, crit: 'normal' },
+      sleep:  { on: false, min: 180, crit: 'normal' },
+      quiet:  { on: false, from: '22:00', to: '07:00', tz: Intl.DateTimeFormat().resolvedOptions().timeZone },
+    };
+  }
+
+  function defaultBaby() { return { name: '', born: '', sex: '' }; } // configured in the 🔔 modal (kept out of the public repo)
+
+  let entries = [];              // hot-window entries (older ones live in server archives)
+  let active = { sleep: null, nurse: null }; // in-progress timers: {start, mt[, side]}
+  let alerts = defaultAlerts();  // shared alert rules (synced; evaluated by the worker cron)
+  let alertsRev = 0;             // last-modified ts of alerts (merge tiebreaker)
+  let baby = defaultBaby();      // baby identity (synced; one room = one baby)
+  let babyRev = 0;
+  let deleted = {};              // tombstones {entryId: deleteTs} so deletes survive merges
+  let archivedBefore = 0;        // server watermark: entries older than this are archived
+  let deviceName = (function(){ try { return localStorage.getItem(NAME_KEY) || ''; } catch(e) { return ''; } })();
+  let tick = null;
+  let revision = 0;
+  let syncOk = null;
+
+  // ---- theme (per-device preference, not synced) ----
+  const themeBtn = document.getElementById('themeBtn');
+  function paintThemeBtn() {
+    themeBtn.textContent = document.documentElement.dataset.theme === 'light' ? '🌙' : '☀️';
+  }
+  themeBtn.addEventListener('click', () => {
+    const next = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
+    document.documentElement.dataset.theme = next;
+    try { localStorage.setItem('btTheme', next); } catch(e) {}
+    paintThemeBtn();
+  });
+  paintThemeBtn();
+
+  // ---- UI mode (per-device, not synced): full = everything, quick = just the
+  // big action buttons for one-handed logging on the go ----
+  const MODE_KEY = 'btUiMode';
+  const modeBtn = document.getElementById('modeBtn');
+  let uiMode = (function(){ try { return localStorage.getItem(MODE_KEY) === 'quick' ? 'quick' : 'full'; } catch(e) { return 'full'; } })();
+  function applyUiMode() {
+    document.body.classList.toggle('quick', uiMode === 'quick');
+    modeBtn.textContent = uiMode === 'quick' ? '📋' : '⚡';
+    modeBtn.title = uiMode === 'quick' ? 'Show all data' : 'Big buttons only';
+  }
+  modeBtn.addEventListener('click', () => {
+    uiMode = uiMode === 'quick' ? 'full' : 'quick';
+    try { localStorage.setItem(MODE_KEY, uiMode); } catch(e) {}
+    applyUiMode();
+  });
+  applyUiMode();
+
+  // ---- login gate: password unlocks the app; the sync room id is derived from the
+  // password, so every device that signs in lands in the same room automatically ----
+  let room = (function(){ try { return localStorage.getItem(AUTH_KEY) || null; } catch(e) { return null; } })();
+
+  async function sha256Hex(str) {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+  }
+  const loginPass = document.getElementById('loginPass');
+  async function doLogin() {
+    const pw = loginPass.value;
+    if (!pw) return;
+    let hash;
+    try { hash = await sha256Hex(pw); } catch(e) { showErr('loginErr', 'Needs a secure (https) connection'); return; }
+    if (hash !== PASS_SHA256) { showErr('loginErr', 'Wrong password'); return; }
+    // one room = one baby: an optional baby name salts the room id, so the same
+    // family password opens a separate log per baby (empty = the original room)
+    const slug = document.getElementById('loginBaby').value.trim().toLowerCase();
+    room = (await sha256Hex(slug ? `baby-room-v1:${pw}:${slug}` : 'baby-room-v1:' + pw)).slice(0, 32);
+    try { localStorage.setItem(AUTH_KEY, room); } catch(e) {}
+    loginPass.value = '';
+    closeOverlay('loginOverlay');
+    setSyncNote(syncOk);
+    pull();
+  }
+  document.getElementById('loginBtn').addEventListener('click', doLogin);
+  loginPass.addEventListener('keydown', (e) => { if (e.key === 'Enter') doLogin(); });
+
+  // ---- persistence ----
+  function currentState() {
+    return { revision, entries, active, alerts, alertsRev, baby, babyRev, deleted, archivedBefore };
+  }
+  function adopt(s) {
+    revision = s.revision;
+    entries = s.entries;
+    active = s.active;
+    alerts = s.alerts || defaultAlerts();
+    alertsRev = s.alertsRev;
+    baby = s.baby || defaultBaby();
+    babyRev = s.babyRev || 0;
+    deleted = s.deleted;
+    archivedBefore = s.archivedBefore;
+  }
+  function save() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(currentState()));
+    } catch(e) { /* private mode / full storage - ignore */ }
+  }
+  function load() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) adopt(normalizeState(JSON.parse(raw)));
+    } catch(e) { entries = []; }
+  }
+
+  // ---- cross-device sync (last write wins by revision) ----
+  function setSyncNote(state) {
+    const el = document.getElementById('syncNote');
+    if (!room) {
+      el.className = 'saved-note';
+      el.textContent = 'Not signed in — saved to this device only.';
+    } else if (state === true) {
+      el.className = 'saved-note ok';
+      el.textContent = 'Synced across devices ✓';
+    } else if (state === false) {
+      el.className = 'saved-note warn';
+      el.textContent = 'Offline — saved on this device, will sync when connection returns.';
+    } else {
+      el.className = 'saved-note';
+      el.textContent = 'Connecting to sync…';
+    }
+  }
+
+  function pushState() {
+    if (!room) return;
+    fetch(`${SYNC_URL}/state/${room}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(currentState()),
+    })
+      .then(r => { syncOk = r.ok; setSyncNote(syncOk); })
+      .catch(() => { syncOk = false; setSyncNote(false); });
+  }
+
+  // Entry-level merge sync: local and remote are unioned per entry (tombstones
+  // for deletes), so concurrent logging on several devices never loses a tap.
+  async function pull() {
+    if (!room) return;
+    try {
+      const res = await fetch(`${SYNC_URL}/state/${room}`, { cache: 'no-store' });
+      if (!res.ok) throw 0;
+      const remote = await res.json();
+      syncOk = true; setSyncNote(true);
+      if (!remote) { pushState(); return; }
+      const merged = mergeState(currentState(), remote);
+      const sig = stateSig(merged);
+      const changedLocal = sig !== stateSig(currentState());
+      const changedRemote = sig !== stateSig(remote);
+      if (changedLocal) {
+        adopt(merged);
+        save();
+        updateActionUI();
+        paintAlertRules();
+        paintBaby();
+        render();
+      }
+      if (changedRemote) { revision = Date.now(); save(); pushState(); }
+    } catch(e) {
+      syncOk = false; setSyncNote(false);
+    }
+  }
+
+  function touch() {
+    revision = Date.now();
+    save();
+    pushState();
+  }
+  function bumpAlerts() { // any change to the shared alert config
+    alertsRev = Date.now();
+    touch();
+  }
+  function stamp(entry) { // creation metadata: modified-ts + who logged it
+    entry.mt = Date.now();
+    if (deviceName) entry.by = deviceName;
+    return entry;
+  }
+
+  // ---- formatting helpers ----
+  function fmtShort(ms) {
+    const totalMin = Math.round(ms / 60000);
+    const h = Math.floor(totalMin / 60);
+    const m = totalMin % 60;
+    if (h > 0) return `${h}h ${m}m`;
+    if (totalMin > 0) return `${totalMin}m`;
+    return `${Math.round(ms/1000)}s`;
+  }
+  function fmtClock(ts) { // always 24h, regardless of device locale
+    const d = new Date(ts);
+    return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  }
+  function esc(s) {
+    return s.replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  }
+  function timeInputVal(ts) {
+    const d = new Date(ts);
+    return `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
+  }
+  function dateInputVal(ts) {
+    const d = new Date(ts);
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  }
+  function combineDateTime(ymd, hhmm) {
+    const dm = ymd.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    const tm = hhmm.trim().match(/^(\d{1,2})[:.](\d{2})$/);
+    if (!dm || !tm || +tm[1] > 23 || +tm[2] > 59) return null;
+    const t = new Date(+dm[1], +dm[2] - 1, +dm[3], +tm[1], +tm[2], 0, 0).getTime();
+    return isNaN(t) ? null : t;
+  }
+  function applyTimeToDate(base, hhmm) {
+    const m = hhmm.trim().match(/^(\d{1,2})[:.](\d{2})$/);
+    if (!m || +m[1] > 23 || +m[2] > 59) return null;
+    const d = new Date(base);
+    d.setHours(+m[1], +m[2], d.getSeconds(), 0);
+    return d.getTime();
+  }
+  // Quick-log modals take a time-of-day assumed "today" — around midnight a
+  // just-before-midnight time would land in the future; treat it as yesterday.
+  function applyTimeBack(hhmm) {
+    const t = applyTimeToDate(Date.now(), hhmm);
+    if (t === null) return null;
+    return t > Date.now() + 5 * 60000 ? t - 86400000 : t;
+  }
+  function sideLabel(s) { return s === 'L' ? 'Left' : s === 'R' ? 'Right' : 'Both sides'; }
+  function kindLabel(k) { return k === 'wet' ? 'Wet' : k === 'dirty' ? 'Dirty' : 'Wet + dirty'; }
+  function milkLabel(k) { return k === 'formula' ? 'Formula' : k === 'breast' ? 'Breast milk' : 'Mixed'; }
+
+  function entryIcon(e) {
+    if (e.type === 'sleep') return '😴';
+    if (e.type === 'nurse') return '🤱';
+    if (e.type === 'bottle') return '🍼';
+    if (e.type === 'solid') return '🥄';
+    if (e.type === 'diaper') return e.kind === 'wet' ? '💧' : e.kind === 'dirty' ? '💩' : '💧💩';
+    if (e.type === 'med') return '💊';
+    if (e.type === 'pump') return ICO_PUMP;
+    if (e.type === 'health') return '🌡️';
+    if (e.type === 'bath') return '🛁';
+    return '•';
+  }
+  function entryTypeLabel(e) {
+    if (e.type === 'sleep') return 'Sleep';
+    if (e.type === 'nurse') return 'Nurse';
+    if (e.type === 'bottle') return 'Bottle';
+    if (e.type === 'solid') return 'Solids';
+    if (e.type === 'diaper') return 'Diaper';
+    if (e.type === 'med') return 'Medicine';
+    if (e.type === 'pump') return 'Pump';
+    if (e.type === 'health') return 'Health';
+    if (e.type === 'bath') return 'Bath';
+    return e.type;
+  }
+  function toGrams(w) { return w == null ? null : Math.round(w < 100 ? w * 1000 : w); } // legacy entries stored kg
+  function healthDetail(e) {
+    const parts = [];
+    if (e.temp != null) parts.push(`${e.temp}°C`);
+    if (e.weight != null) parts.push(`${toGrams(e.weight)} g`);
+    if (e.length != null) parts.push(`${e.length} cm`);
+    return parts.join(' · ');
+  }
+  function entryDetail(e) {
+    if (e.type === 'sleep' || e.type === 'nurse') {
+      let d = fmtShort(e.duration);
+      if (e.type === 'nurse') d += ` · ${sideLabel(e.side)}`;
+      return d;
+    }
+    if (e.type === 'bottle') return `${e.amount}${e.unit}${e.milk ? ' · ' + milkLabel(e.milk) : ''}`;
+    if (e.type === 'diaper') return kindLabel(e.kind);
+    if (e.type === 'solid') return e.food || '';
+    if (e.type === 'med') return e.name || '';
+    if (e.type === 'pump') return `${e.amount}${e.unit} · ${sideLabel(e.side)}`;
+    if (e.type === 'health') return healthDetail(e);
+    return '';
+  }
+
+  // ---- age-aware urgency coloring for the "X ago" hints ----
+  // Gaps turn orange (warn) then red (late) at age-appropriate limits that
+  // loosen as the baby grows: newborns feed every 2-3h and have 45-60 min
+  // wake windows; by a year, feeds spread to 4-5h and wake windows reach ~4h.
+  // The birth date comes from the synced baby config (🔔 modal).
+  const AGE_BANDS = [ // [maxAgeWeeks, feedWarn, feedRed, diaperWarn, diaperRed, awakeWarn, awakeRed] (minutes)
+    [6,        150, 210, 180, 240,  60,  90],
+    [13,       180, 240, 180, 240,  75, 105],
+    [26,       210, 270, 240, 300, 120, 150],
+    [39,       240, 300, 240, 300, 150, 195],
+    [52,       240, 300, 300, 360, 180, 240],
+    [Infinity, 300, 360, 300, 360, 240, 330],
+  ];
+  function babyBornTs() {
+    const m = (baby.born || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!m) return null;
+    const t = new Date(+m[1], +m[2] - 1, +m[3]).getTime();
+    return isNaN(t) ? null : t;
+  }
+  function ageThresholds(now) { // null until a birth date is configured — no coloring then
+    const born = babyBornTs();
+    if (born === null) return null;
+    const weeks = (now - born) / (7 * 86400000);
+    const b = AGE_BANDS.find(r => weeks < r[0]) || AGE_BANDS[AGE_BANDS.length - 1];
+    return { feed: [b[1], b[2]], diaper: [b[3], b[4]], awake: [b[5], b[6]] };
+  }
+  function babyAgeLabel(now) {
+    const born = babyBornTs();
+    if (born === null || now < born) return '';
+    const days = Math.floor((now - born) / 86400000);
+    if (days < 31) return `${days}d`;
+    const b = new Date(born), n = new Date(now);
+    let months = (n.getFullYear() - b.getFullYear()) * 12 + (n.getMonth() - b.getMonth());
+    let anchor = new Date(b); anchor.setMonth(b.getMonth() + months);
+    if (anchor > n) { months--; anchor = new Date(b); anchor.setMonth(b.getMonth() + months); }
+    const rest = Math.floor((n - anchor) / 86400000);
+    return rest ? `${months}m ${rest}d` : `${months}m`;
+  }
+  function paintBaby() {
+    const age = babyAgeLabel(Date.now());
+    document.querySelector('.top h1').innerHTML =
+      esc(baby.name || 'Baby Tracker') + (age ? ` <span class="agechip">(${age})</span>` : '');
+    document.title = baby.name ? `${baby.name} — Baby Tracker` : 'Baby Tracker';
+  }
+
+  // ---- stats / header ----
+  function latestFeedTime() {
+    let best = null;
+    for (const e of entries) {
+      if (e.type === 'nurse' || e.type === 'bottle' || e.type === 'solid') {
+        const t = e.end || e.start;
+        if (best === null || t > best) best = t;
+      }
+    }
+    return best;
+  }
+  function latestDiaperTime() {
+    let best = null;
+    for (const e of entries) if (e.type === 'diaper' && (best === null || e.start > best)) best = e.start;
+    return best;
+  }
+  function lastOfType(type) {
+    let best = null;
+    for (const e of entries) if (e.type === type) { const t = e.end || e.start; if (best === null || t > best) best = t; }
+    return best;
+  }
+  function agoOr(type, fallback) {
+    const t = lastOfType(type);
+    return t ? fmtShort(Date.now() - t) + ' ago' : fallback;
+  }
+  function startOfToday() {
+    const d = new Date(); d.setHours(0,0,0,0); return d.getTime();
+  }
+  function updateStats() {
+    const now = Date.now();
+    const th = ageThresholds(now); // null = no birth date set yet
+    const urg = (t, key) => !th || t == null ? '' : now - t >= th[key][1] * 60000 ? ' late' : now - t >= th[key][0] * 60000 ? ' warn' : '';
+
+    const feedT = latestFeedTime();
+    const feedCls = active.nurse ? '' : urg(feedT, 'feed'); // nursing right now = feed being handled
+    const sinceFeedEl = document.getElementById('sinceFeed');
+    sinceFeedEl.textContent = active.nurse
+      ? `Nursing · ${fmtShort(now - active.nurse.start)}`
+      : (feedT ? fmtShort(now - feedT) + ' ago' : '—');
+    sinceFeedEl.className = 'value' + feedCls;
+
+    const diaperT = latestDiaperTime();
+    const diaperCls = urg(diaperT, 'diaper');
+    const sinceDiaperEl = document.getElementById('sinceDiaper');
+    sinceDiaperEl.textContent = diaperT ? fmtShort(now - diaperT) + ' ago' : '—';
+    sinceDiaperEl.className = 'value' + diaperCls;
+
+    const sleepLabel = document.getElementById('sleepLabel');
+    const sleepVal = document.getElementById('sleepVal');
+    let awakeCls = '';
+    if (active.sleep) {
+      sleepLabel.textContent = 'Asleep for';
+      sleepVal.textContent = fmtShort(now - active.sleep.start);
+      sleepVal.className = 'value active';
+    } else {
+      const lastSleepEnd = entries.filter(e => e.type === 'sleep').map(e => e.end).sort((a,b)=>b-a)[0];
+      if (lastSleepEnd) {
+        awakeCls = urg(lastSleepEnd, 'awake');
+        sleepLabel.textContent = 'Awake for';
+        sleepVal.textContent = fmtShort(now - lastSleepEnd);
+      } else {
+        sleepLabel.textContent = 'Sleep';
+        sleepVal.textContent = '—';
+      }
+      sleepVal.className = 'value' + awakeCls;
+    }
+
+    const today0 = startOfToday();
+    const todays = entries.filter(e => e.start >= today0);
+    const feedCount = todays.filter(e => e.type === 'nurse' || e.type === 'bottle' || e.type === 'solid').length;
+    const nurseMin = Math.round(todays.filter(e => e.type === 'nurse').reduce((n, e) => n + (e.duration || 0), 0) / 60000);
+    const diaperCount = todays.filter(e => e.type === 'diaper').length;
+    document.getElementById('todaySummary').textContent =
+      `${feedCount} feed${feedCount===1?'':'s'}${nurseMin ? ` (${nurseMin}m)` : ''} · ${diaperCount} diaper${diaperCount===1?'':'s'}`;
+
+    // "(X ago)" on the action buttons; running timers own their own sub text.
+    // Nurse/diaper/sleep subs carry the age-aware urgency color (nurse uses the
+    // overall feed gap — a bottle also resets it).
+    if (!active.sleep) sleepBtnSub.textContent = agoOr('sleep', 'Tap to start');
+    sleepBtnSub.className = 'sub2' + (active.sleep ? '' : awakeCls);
+    if (!active.nurse) nurseBtnSub.textContent = agoOr('nurse', 'Tap to start');
+    nurseBtnSub.className = 'sub2' + feedCls;
+    document.getElementById('bottleBtnSub').textContent = agoOr('bottle', 'Amount & type');
+    const diaperBtnSubEl = document.getElementById('diaperBtnSub');
+    diaperBtnSubEl.textContent = agoOr('diaper', 'Wet / dirty');
+    diaperBtnSubEl.className = 'sub2' + diaperCls;
+    document.getElementById('solidBtnSub').textContent = agoOr('solid', 'What & when');
+    document.getElementById('pumpBtnSub').textContent = agoOr('pump', 'Amount & side');
+    document.getElementById('medBtnSub').textContent = agoOr('med', 'Vitamins etc.');
+    document.getElementById('healthBtnSub').textContent = agoOr('health', 'Temp / growth');
+    document.getElementById('bathBtnSub').textContent = agoOr('bath', 'Splish splash');
+  }
+
+  // ---- activity timeline: one lane per type; bars for durations, dots/icons for
+  // events; span (6/12/24h) is a per-device preference ----
+  const TL_SPAN_KEY = 'btTlSpan';
+  let tlSpan = (function(){ try { const v = +localStorage.getItem(TL_SPAN_KEY); return [6, 12, 24].includes(v) ? v : 24; } catch(e) { return 24; } })();
+  const tlSpansEl = document.getElementById('tlSpans');
+  function paintTlSpan() {
+    tlSpansEl.querySelectorAll('button').forEach(b => b.classList.toggle('sel', +b.dataset.h === tlSpan));
+    document.getElementById('tlTitle').textContent = `Last ${tlSpan} hours`;
+  }
+  tlSpansEl.addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    tlSpan = +b.dataset.h;
+    try { localStorage.setItem(TL_SPAN_KEY, String(tlSpan)); } catch(err) {}
+    paintTlSpan();
+    renderTimeline();
+  });
+  paintTlSpan();
+
+  const ICO_DIAPER = '<svg class="svgico"><use href="#icoDiaper"/></svg>';
+  const ICO_PUMP = '<svg class="svgico"><use href="#icoPump"/></svg>';
+  const TL_TYPES = [
+    { type: 'sleep', ico: '😴' },
+    { type: 'nurse', ico: '🤱' },
+    { type: 'diaper', ico: ICO_DIAPER },
+    { type: 'bottle', ico: '🍼' },
+    { type: 'pump', ico: ICO_PUMP },
+    { type: 'solid', ico: '🥄' },
+    { type: 'med', ico: '💊' },
+    { type: 'health', ico: '🌡️' },
+    { type: 'bath', ico: '🛁' },
+  ];
+  // hour-aligned clock ticks for the current span (used for gridlines + axis labels)
+  function tlTicks(from, now) {
+    const stepH = tlSpan === 24 ? 6 : tlSpan === 12 ? 3 : 2;
+    const d = new Date(from); d.setMinutes(0, 0, 0);
+    let t = d.getTime();
+    while (t < from || new Date(t).getHours() % stepH !== 0) t += 3600000;
+    const ticks = [];
+    for (; t <= now; t += stepH * 3600000) ticks.push(t);
+    return ticks;
+  }
+
+  function renderTimeline() {
+    const now = Date.now();
+    const spanMs = tlSpan * 3600000;
+    const from = now - spanMs;
+    const pct = (t) => (t - from) / spanMs * 100;
+    const sideTag = (s) => `<span class="tlside">${s === 'both' ? 'B' : (s || '')}</span>`;
+    const ticks = tlTicks(from, now);
+    const tickHtml = ticks.map(t => `<span class="tltick" style="left:${pct(t)}%"></span>`).join('');
+    let html = '<div class="tlbody">';
+    for (const t of TL_TYPES) {
+      let evs = '';
+      for (const e of entries) {
+        if (e.type !== t.type || (e.end || e.start) < from) continue;
+        if (e.end) {
+          const l = Math.max(0, pct(e.start)), r = Math.min(100, pct(e.end));
+          const label = t.type === 'nurse' ? sideTag(e.side) : '';
+          evs += `<span class="tlbar ${t.type}" style="left:${l}%;width:${Math.max(r - l, 0.7)}%">${label}</span>`;
+        } else if (t.type === 'diaper') {
+          const ico = e.kind === 'dirty' ? '💩' : e.kind === 'both' ? '💧💩' : '💧';
+          evs += `<span class="tlem" style="left:${pct(e.start)}%" title="${kindLabel(e.kind)}">${ico}</span>`;
+        } else {
+          evs += `<span class="tldot ${t.type}" style="left:${pct(e.start)}%"></span>`;
+        }
+      }
+      const a = active[t.type];
+      if (a) {
+        const l = Math.max(0, pct(a.start));
+        const label = t.type === 'nurse' ? sideTag(a.side) : '';
+        evs += `<span class="tlbar live ${t.type}" style="left:${l}%;width:${Math.max(100 - l, 0.7)}%">${label}</span>`;
+      }
+      html += `<div class="tlrow"><span class="tlico">${t.ico}</span><div class="tltrack">${tickHtml}${evs}</div></div>`;
+    }
+    html += '<div class="tlscrub"></div></div>';
+    html += '<div class="tlaxis">' + ticks.map(t => {
+      const p = pct(t);
+      if (p > 90) return ''; // would collide with the "now" label
+      return `<span${p < 4 ? ' class="edgeL"' : ''} style="left:${p}%">${fmtClock(t)}</span>`;
+    }).join('') + '<span class="tlnow">now</span></div>';
+    document.getElementById('timeline').innerHTML = html;
+    paintTlCursor();
+  }
+
+  // ---- timeline scrubber: drag anywhere on the lanes to place a vertical
+  // cursor and read the exact clock time at that point; tap the bubble to
+  // dismiss. Position is a 0..1 fraction so it survives re-renders. ----
+  const timelineEl = document.getElementById('timeline');
+  let tlCursor = null;
+  let tlDragging = false;
+  function paintTlCursor() {
+    const scrub = timelineEl.querySelector('.tlscrub');
+    if (!scrub) return;
+    if (tlCursor === null) { scrub.innerHTML = ''; return; }
+    if (!scrub.firstChild) scrub.innerHTML = '<div class="tlline"></div><div class="tlbubble"></div>';
+    const now = Date.now();
+    const spanMs = tlSpan * 3600000;
+    const t = now - spanMs + tlCursor * spanMs;
+    const ago = now - t;
+    scrub.querySelector('.tlline').style.left = (tlCursor * 100) + '%';
+    const bub = scrub.querySelector('.tlbubble');
+    bub.style.left = (Math.max(0.09, Math.min(0.91, tlCursor)) * 100) + '%';
+    bub.textContent = `${fmtClock(t)} · ${ago < 60000 ? 'now' : fmtShort(ago) + ' ago'}`;
+  }
+  function tlScrubTo(clientX) {
+    const track = timelineEl.querySelector('.tltrack');
+    if (!track) return;
+    const r = track.getBoundingClientRect();
+    tlCursor = Math.max(0, Math.min(1, (clientX - r.left) / r.width));
+    paintTlCursor();
+  }
+  timelineEl.addEventListener('pointerdown', (e) => {
+    if (e.target.closest('.tlbubble')) { tlCursor = null; paintTlCursor(); return; }
+    if (!e.target.closest('.tlbody')) return;
+    tlDragging = true;
+    try { timelineEl.setPointerCapture(e.pointerId); } catch(err) {}
+    tlScrubTo(e.clientX);
+  });
+  timelineEl.addEventListener('pointermove', (e) => { if (tlDragging) tlScrubTo(e.clientX); });
+  timelineEl.addEventListener('pointerup', () => { tlDragging = false; });
+  timelineEl.addEventListener('pointercancel', () => { tlDragging = false; });
+
+  // ---- log list: type filter chips + collapsible day sections (today always
+  // open; past days start as a one-line summary header). Both are view state
+  // only — in memory, so the sync poll's re-renders don't reset them. ----
+  const TODAY_STEP = 5;          // today's log shows this many at first; "Load more" reveals the rest
+  let todayLimit = TODAY_STEP;
+  let pastWeeks = 1;             // how many weeks of past days to show; "Load more" adds one
+  const LOG_FILTER_KEY = 'btLogFilter'; // per-device, survives reloads
+  let logFilter = (function(){
+    try {
+      const v = localStorage.getItem(LOG_FILTER_KEY) || '';
+      return ['sleep','nurse','bottle','pump','diaper','solid','med','health','bath'].includes(v) ? v : '';
+    } catch(e) { return ''; }
+  })();
+  const expandedDays = new Set(); // toDateString() keys of past days the user opened
+
+  const logFilterRow = document.getElementById('logFilterRow');
+  function paintLogFilter() {
+    logFilterRow.querySelectorAll('button').forEach(x => x.classList.toggle('sel', x.dataset.t === logFilter));
+  }
+  logFilterRow.addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    logFilter = b.dataset.t;
+    try { localStorage.setItem(LOG_FILTER_KEY, logFilter); } catch(err) {}
+    paintLogFilter();
+    todayLimit = TODAY_STEP; pastWeeks = 1; // reset paging when the view changes
+    render();
+  });
+  paintLogFilter();
+
+  const expandAllBtn = document.getElementById('expandAllBtn');
+  expandAllBtn.addEventListener('click', () => {
+    const todayKey = new Date().toDateString();
+    const keys = new Set();
+    for (const e of entries) {
+      if (logFilter && e.type !== logFilter) continue;
+      const k = new Date(e.start).toDateString();
+      if (k !== todayKey) keys.add(k);
+    }
+    const anyCollapsed = [...keys].some(k => !expandedDays.has(k));
+    if (anyCollapsed) keys.forEach(k => expandedDays.add(k));
+    else expandedDays.clear();
+    render();
+  });
+
+  function daySummary(list) {
+    if (logFilter) {
+      const ico = (TL_TYPES.find(t => t.type === logFilter) || {}).ico || '';
+      return `${list.length} × ${ico}`;
+    }
+    const feeds = list.filter(e => e.type === 'nurse' || e.type === 'bottle' || e.type === 'solid').length;
+    const diapers = list.filter(e => e.type === 'diaper').length;
+    const sleepMs = list.filter(e => e.type === 'sleep').reduce((n, e) => n + (e.duration || 0), 0);
+    const parts = [];
+    if (feeds) parts.push(`${feeds} feed${feeds === 1 ? '' : 's'}`);
+    if (diapers) parts.push(`${diapers} diaper${diapers === 1 ? '' : 's'}`);
+    if (sleepMs) parts.push(fmtShort(sleepMs));
+    return parts.join(' · ') || `${list.length} ${list.length === 1 ? 'entry' : 'entries'}`;
+  }
+
+  function entryLi(e) {
+    const by = e.by ? ` · ${e.by}` : '';
+    const li = document.createElement('li');
+    li.innerHTML = `<span class="ico">${entryIcon(e)}</span>
+                    <span class="main"><span class="type">${entryTypeLabel(e)}</span><span class="detail">${esc(entryDetail(e) + by)}</span></span>
+                    <span class="time">${fmtClock(e.start)}</span>
+                    <span class="rowacts">
+                      <button class="rowbtn" data-edit="${e.id}" aria-label="Edit">✎</button>
+                      <button class="rowbtn" data-del="${e.id}" aria-label="Delete">✕</button>
+                    </span>${e.note ? `<span class="note">${esc(e.note)}</span>` : ''}`;
+    return li;
+  }
+
+  function render() {
+    updateStats();
+    renderTimeline();
+    renderHistory();
+    renderGrowth();
+    if (alertPrefs) evalLocalAlarms(); // logging an activity silences a ringing alarm immediately
+    const sorted = entries.slice().sort((a,b) => b.start - a.start); // newest first
+    const filtered = logFilter ? sorted.filter(e => e.type === logFilter) : sorted;
+    if (filtered.length === 0) {
+      logList.innerHTML = `<li class="empty">${sorted.length === 0 ? 'Nothing logged yet.' : 'Nothing logged for this filter.'}</li>`;
+      expandAllBtn.style.display = 'none';
+      return;
+    }
+    logList.innerHTML = '';
+    const dayFmt = new Intl.DateTimeFormat([], { weekday: 'short', day: 'numeric', month: 'short' });
+    const todayKey = new Date().toDateString();
+    const showmore = (attr, label) => {
+      const li = document.createElement('li');
+      li.className = 'showmore';
+      li.innerHTML = `<button ${attr}>${label}</button>`;
+      logList.appendChild(li);
+    };
+    const pastCap = pastWeeks * 7; // number of past day-sections to show
+    let pastShown = 0, pastHidden = 0, collapsedDays = 0;
+    let i = 0;
+    while (i < filtered.length) {
+      const key = new Date(filtered[i].start).toDateString();
+      const day = [];
+      while (i < filtered.length && new Date(filtered[i].start).toDateString() === key) day.push(filtered[i++]);
+      const isToday = key === todayKey;
+      if (isToday) {
+        // today: newest first, capped at todayLimit with a "Load more" for the rest
+        day.forEach((e, n) => { if (n < todayLimit) logList.appendChild(entryLi(e)); });
+        if (day.length > todayLimit) showmore('data-todaymore', `Load more… (${day.length - todayLimit} earlier today)`);
+      } else {
+        if (pastShown >= pastCap) { pastHidden++; continue; } // beyond the loaded weeks
+        pastShown++;
+        const open = expandedDays.has(key);
+        if (!open) collapsedDays++;
+        const h = document.createElement('li');
+        h.className = 'dayhead';
+        h.dataset.day = key;
+        h.innerHTML = `<span><span class="arr">${open ? '▾' : '▸'}</span>${dayFmt.format(day[0].start)}</span><span class="daysum">${daySummary(day)}</span>`;
+        logList.appendChild(h);
+        if (open) for (const e of day) logList.appendChild(entryLi(e));
+      }
+    }
+    if (pastHidden > 0) showmore('data-pastmore', `Load more… (${pastHidden} earlier day${pastHidden === 1 ? '' : 's'})`);
+    expandAllBtn.style.display = pastShown ? '' : 'none';
+    expandAllBtn.textContent = collapsedDays ? 'Expand all' : 'Collapse all';
+  }
+
+  const logList = document.getElementById('logList');
+  logList.addEventListener('click', (e) => {
+    if (e.target.closest('[data-todaymore]')) { todayLimit = Infinity; render(); return; }
+    if (e.target.closest('[data-pastmore]')) { pastWeeks += 1; render(); return; }
+    const dh = e.target.closest('.dayhead');
+    if (dh) {
+      const k = dh.dataset.day;
+      if (expandedDays.has(k)) expandedDays.delete(k); else expandedDays.add(k);
+      render();
+      return;
+    }
+    const btn = e.target.closest('.rowbtn');
+    if (!btn) return;
+    if (btn.dataset.edit !== undefined) editRow(btn.dataset.edit);
+    else if (btn.dataset.del !== undefined) deleteRow(btn.dataset.del);
+  });
+
+  function deleteRow(id) {
+    const i = entries.findIndex(e => e.id === id);
+    if (i === -1) return;
+    const e = entries[i];
+    if (!confirm(`Delete this ${entryTypeLabel(e).toLowerCase()} entry from ${fmtClock(e.start)}?`)) return;
+    entries.splice(i, 1);
+    deleted[id] = Date.now(); // tombstone so the delete survives merges
+    touch();
+    render();
+  }
+
+  // ---- daily history: last 7 days (expandable) + an average row over a
+  // selectable window (7d/14d/1m, per-device pref) ----
+  let histDays = 7;
+  const AVG_SPAN_KEY = 'btAvgSpan';
+  let avgSpan = (function(){ try { const v = +localStorage.getItem(AVG_SPAN_KEY); return [7, 14, 30].includes(v) ? v : 7; } catch(e) { return 7; } })();
+  const avgSpansEl = document.getElementById('avgSpans');
+  function paintAvgSpan() {
+    avgSpansEl.querySelectorAll('button').forEach(b => b.classList.toggle('sel', +b.dataset.d === avgSpan));
+  }
+  avgSpansEl.addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    avgSpan = +b.dataset.d;
+    try { localStorage.setItem(AVG_SPAN_KEY, String(avgSpan)); } catch(err) {}
+    paintAvgSpan();
+    renderHistory();
+  });
+  paintAvgSpan();
+  function renderHistory() {
+    const el = document.getElementById('history');
+    const dayFmt = new Intl.DateTimeFormat([], { weekday: 'short', day: 'numeric', month: 'short' });
+    const toMl = (e) => (e.amount || 0) * (e.unit === 'oz' ? 29.57 : 1);
+    const statsFor = (day0) => {
+      const t0 = day0.getTime(), t1 = t0 + 86400000;
+      const list = entries.filter(e => e.start >= t0 && e.start < t1);
+      return {
+        count: list.length,
+        feeds: list.filter(e => e.type === 'nurse' || e.type === 'bottle' || e.type === 'solid').length,
+        nurseMin: Math.round(list.filter(e => e.type === 'nurse').reduce((n, e) => n + (e.duration || 0), 0) / 60000),
+        ml: Math.round(list.filter(e => e.type === 'bottle').reduce((n, e) => n + toMl(e), 0)),
+        sleepMs: list.filter(e => e.type === 'sleep').reduce((n, e) => n + (e.duration || 0), 0),
+        diapers: list.filter(e => e.type === 'diaper').length,
+      };
+    };
+    let html = '<div class="histrow head"><span>Day</span><span>Feeds</span><span>Bottle</span><span>Sleep</span><span>Diapers</span></div>';
+
+    const firstStart = entries.length ? entries.reduce((m, e) => Math.min(m, e.start), Infinity) : null;
+    const today0 = new Date(); today0.setHours(0, 0, 0, 0);
+
+    // average over the last up-to-avgSpan FULL days (today excluded — it's partial)
+    if (firstStart !== null) {
+      let n = 0;
+      const tot = { feeds: 0, nurseMin: 0, ml: 0, sleepMs: 0, diapers: 0 };
+      for (let d = 1; d <= avgSpan; d++) {
+        const day0 = new Date(today0); day0.setDate(today0.getDate() - d);
+        if (day0.getTime() + 86400000 <= firstStart) break; // before the log began
+        const s = statsFor(day0);
+        n++;
+        tot.feeds += s.feeds; tot.nurseMin += s.nurseMin; tot.ml += s.ml; tot.sleepMs += s.sleepMs; tot.diapers += s.diapers;
+      }
+      if (n > 0) {
+        const f1 = (v) => String(Math.round(v * 10) / 10);
+        const nm = Math.round(tot.nurseMin / n), ml = Math.round(tot.ml / n), sl = tot.sleepMs / n;
+        html += `<div class="histrow avg"><span class="day">Avg (${n}d)</span><span>${f1(tot.feeds / n)}${nm ? ` <span class="histsub">(${nm}m)</span>` : ''}</span><span>${ml ? ml + ' ml' : '—'}</span><span>${sl ? fmtShort(sl) : '—'}</span><span>${f1(tot.diapers / n)}</span></div>`;
+      }
+    }
+
+    for (let d = 0; d < histDays; d++) {
+      const day0 = new Date(today0); day0.setDate(today0.getDate() - d);
+      const s = statsFor(day0);
+      if (d > 0 && s.count === 0) continue;
+      html += `<div class="histrow"><span class="day">${d === 0 ? 'Today' : dayFmt.format(day0)}</span><span>${s.feeds}${s.nurseMin ? ` <span class="histsub">(${s.nurseMin}m)</span>` : ''}</span><span>${s.ml ? s.ml + ' ml' : '—'}</span><span>${s.sleepMs ? fmtShort(s.sleepMs) : '—'}</span><span>${s.diapers}</span></div>`;
+    }
+
+    // older data still in the hot window?
+    const oldestShown = new Date(today0); oldestShown.setDate(today0.getDate() - (histDays - 1));
+    if (firstStart !== null && firstStart < oldestShown.getTime()) {
+      html += '<div class="histmore"><button data-histmore>Show earlier days</button></div>';
+    }
+    el.innerHTML = html;
+  }
+  document.getElementById('history').addEventListener('click', (e) => {
+    if (e.target.closest('[data-histmore]')) { histDays += 7; renderHistory(); }
+  });
+
+  // ---- weight-for-age growth chart (WHO Child Growth Standards) ----
+  // Reference curves are derived from the WHO LMS parameters (L = skew, M = median
+  // in kg, S = coefficient of variation) for each age in months; a weight at
+  // percentile p is  M·(1 + L·S·z)^(1/L)  (or M·e^(S·z) when L≈0), z being the
+  // normal deviate for p. We shade the 3rd–97th / 15th–85th bands with the median
+  // line for the configured sex over months 0–6 and overlay the baby's own logged
+  // weights positioned by age. Pure client render from already-synced data — no
+  // new network or KV operations (the one exception, "Show earlier weights",
+  // reuses the on-demand archive fetch and only runs when the user taps it).
+  const WHO_WFA = {
+    girl: [ // [L, M(kg), S] at ages 0,1,…,6 months
+      [0.3809, 3.2322, 0.14171], [0.1714, 4.1873, 0.13724], [0.0962, 5.1282, 0.13000],
+      [0.0402, 5.8458, 0.12619], [-0.0050, 6.4237, 0.12402], [-0.0430, 6.8985, 0.12274],
+      [-0.0756, 7.2970, 0.12204],
+    ],
+    boy: [
+      [0.3487, 3.3464, 0.14602], [0.2297, 4.4709, 0.13395], [0.1970, 5.5675, 0.12385],
+      [0.1738, 6.3762, 0.11727], [0.1553, 7.0023, 0.11316], [0.1395, 7.5105, 0.11080],
+      [0.1257, 7.9340, 0.10958],
+    ],
+  };
+  const WHO_MONTHS = 6; // this first version covers 0–6 months
+  const GROWTH_PCTS = [ // [normal deviate z, label] for 3rd/15th/50th/85th/97th
+    [-1.88079, '3'], [-1.03643, '15'], [0, '50'], [1.03643, '85'], [1.88079, '97'],
+  ];
+  const MONTH_MS = 365.25 / 12 * 86400000;
+  function lmsWeight(row, z) { // WHO LMS → weight (kg) at deviate z
+    const L = row[0], M = row[1], S = row[2];
+    return Math.abs(L) < 1e-7 ? M * Math.exp(S * z) : M * Math.pow(1 + L * S * z, 1 / L);
+  }
+
+  let growthArchive = null; // archived weight entries (older than the hot window), fetched on demand
+
+  function growthPoints() { // the baby's own weights within 0–6 months: {m: ageMonths, kg}
+    const born = babyBornTs();
+    if (born === null) return [];
+    const byId = new Map(); // dedup: a boundary weight can sit in both hot + archive
+    const collect = (list) => { for (const e of list) if (e && e.type === 'health' && e.weight != null) byId.set(e.id, e); };
+    collect(entries);
+    if (growthArchive) collect(growthArchive);
+    const pts = [];
+    for (const e of byId.values()) {
+      const m = (e.start - born) / MONTH_MS;
+      if (m >= 0 && m <= WHO_MONTHS + 0.03) pts.push({ m: Math.min(m, WHO_MONTHS), kg: toGrams(e.weight) / 1000 });
+    }
+    return pts.sort((a, b) => a.m - b.m);
+  }
+
+  function renderGrowth() {
+    const box = document.getElementById('growth');
+    if (!box) return;
+    const born = babyBornTs();
+    const sex = baby.sex === 'girl' || baby.sex === 'boy' ? baby.sex : null;
+    const cfgLink = ' <button class="glink" data-growthcfg>🔔 settings</button>';
+    if (born === null && !sex) { box.innerHTML = `<div class="ghint">Set the baby’s birth date and sex in${cfgLink} to see the WHO weight chart.</div>`; return; }
+    if (born === null) { box.innerHTML = `<div class="ghint">Add the baby’s birth date in${cfgLink} to place weights on the WHO chart.</div>`; return; }
+    if (!sex) { box.innerHTML = `<div class="ghint">Choose the baby’s sex in${cfgLink} to show the matching WHO percentile curves.</div>`; return; }
+
+    const rows = WHO_WFA[sex];
+    const pts = growthPoints();
+
+    // geometry (SVG user units; the chart scales to its container width)
+    const W = 320, H = 210, padL = 24, padR = 14, padT = 10, padB = 20;
+    const x0 = padL, x1 = W - padR, y0 = padT, y1 = H - padB;
+    let lo = Infinity, hi = -Infinity; // y-range from the band extremes, widened for the baby's points
+    for (const r of rows) { lo = Math.min(lo, lmsWeight(r, GROWTH_PCTS[0][0])); hi = Math.max(hi, lmsWeight(r, GROWTH_PCTS[4][0])); }
+    for (const p of pts) { lo = Math.min(lo, p.kg); hi = Math.max(hi, p.kg); }
+    const yMin = Math.floor(lo - 0.3), yMax = Math.ceil(hi + 0.3);
+    const X = (m) => x0 + (m / WHO_MONTHS) * (x1 - x0);
+    const Y = (kg) => y1 - (kg - yMin) / (yMax - yMin) * (y1 - y0);
+
+    const curve = (zi) => rows.map((r, m) => [X(m), Y(lmsWeight(r, GROWTH_PCTS[zi][0]))]);
+    const asPoly = (c) => c.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
+    const band = (lower, upper) => 'M' + lower.map(p => p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' L ')
+      + ' L ' + upper.slice().reverse().map(p => p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' L ') + ' Z';
+    const cv = GROWTH_PCTS.map((_, zi) => curve(zi)); // [c3, c15, c50, c85, c97]
+
+    let svg = `<svg class="gchart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="WHO weight-for-age chart, ${sex === 'girl' ? 'girls' : 'boys'} 0 to 6 months">`;
+    for (let kg = yMin; kg <= yMax; kg++) { // horizontal kg gridlines + labels
+      const y = Y(kg).toFixed(1);
+      svg += `<line class="ggrid" x1="${x0}" y1="${y}" x2="${x1}" y2="${y}"/>`;
+      svg += `<text class="glabel" x="${x0 - 4}" y="${y}" text-anchor="end" dominant-baseline="middle">${kg}</text>`;
+    }
+    for (let m = 0; m <= WHO_MONTHS; m++) { // vertical month gridlines + labels
+      const x = X(m).toFixed(1);
+      svg += `<line class="ggrid" x1="${x}" y1="${y0}" x2="${x}" y2="${y1}"/>`;
+      svg += `<text class="glabel" x="${x}" y="${y1 + 12}" text-anchor="middle">${m}</text>`;
+    }
+    svg += `<text class="glabel" x="${((x0 + x1) / 2).toFixed(1)}" y="${H - 2}" text-anchor="middle">months</text>`;
+    svg += `<path class="gband-out" d="${band(cv[0], cv[4])}"/>`; // 3rd–97th
+    svg += `<path class="gband-in" d="${band(cv[1], cv[3])}"/>`;  // 15th–85th
+    for (const zi of [0, 1, 3, 4]) svg += `<polyline class="gline" points="${asPoly(cv[zi])}"/>`;
+    svg += `<polyline class="gmed" points="${asPoly(cv[2])}"/>`; // median
+    for (let zi = 0; zi < cv.length; zi++) { // percentile labels at the right edge
+      const last = cv[zi][cv[zi].length - 1];
+      svg += `<text class="gplabel" x="${(last[0] + 2).toFixed(1)}" y="${last[1].toFixed(1)}" dominant-baseline="middle">${GROWTH_PCTS[zi][1]}</text>`;
+    }
+    if (pts.length) { // the baby's own weights
+      if (pts.length > 1) svg += `<polyline class="gbaby" points="${pts.map(p => X(p.m).toFixed(1) + ',' + Y(p.kg).toFixed(1)).join(' ')}"/>`;
+      for (const p of pts) svg += `<circle class="gdot" cx="${X(p.m).toFixed(1)}" cy="${Y(p.kg).toFixed(1)}" r="3"/>`;
+    }
+    svg += '</svg>';
+
+    let cap = `Shaded: WHO ${sex === 'girl' ? 'girls' : 'boys'} 3rd–97th percentile (median line). `;
+    cap += pts.length
+      ? `<b>Dots: this baby</b> — latest ${pts[pts.length - 1].kg.toFixed(2)} kg.`
+      : `<b>Log a weight in Health</b> to plot it here.`;
+    let html = svg + `<div class="gcap">${cap}</div>`;
+    if (growthArchive === null && archivedBefore > 0) // earlier weights may be archived beyond the hot window
+      html += `<div class="gmore"><button data-growthmore>Show earlier weights</button></div>`;
+    box.innerHTML = html;
+  }
+
+  // Pull archived months (weights only) on demand — same fetch the CSV export uses,
+  // bounded to the months overlapping 0–6 months of age, run only when the user asks.
+  async function loadGrowthArchive(btn) {
+    if (!room) { growthArchive = []; renderGrowth(); return; }
+    if (btn) { btn.disabled = true; btn.textContent = 'Loading…'; }
+    const born = babyBornTs();
+    let acc = [];
+    try {
+      const months = (await (await fetch(`${SYNC_URL}/archive/${room}`)).json()).months || [];
+      let keep = months;
+      if (born !== null) {
+        const key = (t) => { const d = new Date(t); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); };
+        const startKey = key(born), endKey = key(born + (WHO_MONTHS + 1) * MONTH_MS);
+        keep = months.filter(m => m >= startKey && m <= endKey);
+      }
+      for (const mon of keep) {
+        const arch = await (await fetch(`${SYNC_URL}/archive/${room}/${mon}`)).json();
+        if (Array.isArray(arch)) acc = acc.concat(arch.filter(e => e && e.type === 'health' && e.weight != null));
+      }
+      growthArchive = acc;
+    } catch (e) {
+      growthArchive = acc; // partial/empty — set it anyway so the button doesn't re-prompt
+    }
+    renderGrowth();
+  }
+
+  document.getElementById('growth').addEventListener('click', (e) => {
+    if (e.target.closest('[data-growthcfg]')) { document.getElementById('alertsBtn').click(); return; }
+    const more = e.target.closest('[data-growthmore]');
+    if (more) loadGrowthArchive(more);
+  });
+
+  const CSV_COLS = ['date', 'time', 'type', 'duration_min', 'side', 'amount', 'unit', 'milk', 'kind', 'food', 'name', 'temp_c', 'weight_g', 'length_cm', 'by', 'note'];
+  function csvRow(e) {
+    const v = {
+      date: dateInputVal(e.start), // local date — toISOString would shift post-midnight entries to the previous UTC day
+      time: timeInputVal(e.start),
+      type: e.type,
+      duration_min: e.duration ? Math.round(e.duration / 60000) : '',
+      side: e.side || '', amount: e.amount ?? '', unit: e.unit || '', milk: e.milk || '',
+      kind: e.kind || '', food: e.food || '', name: e.name || '',
+      temp_c: e.temp ?? '', weight_g: e.weight != null ? toGrams(e.weight) : '', length_cm: e.length ?? '',
+      by: e.by || '', note: e.note || '',
+    };
+    return CSV_COLS.map(c => `"${String(v[c]).replace(/"/g, '""')}"`).join(',');
+  }
+  document.getElementById('csvBtn').addEventListener('click', async () => {
+    const btn = document.getElementById('csvBtn');
+    btn.disabled = true; btn.textContent = 'Exporting…';
+    let all = entries.slice();
+    try { // pull archived months from the server for the full history
+      const months = (await (await fetch(`${SYNC_URL}/archive/${room}`)).json()).months || [];
+      for (const mon of months) {
+        const arch = await (await fetch(`${SYNC_URL}/archive/${room}/${mon}`)).json();
+        if (Array.isArray(arch)) all = all.concat(arch);
+      }
+    } catch(e) { /* offline: export the hot window only */ }
+    const seen = new Set();
+    all = all.filter(e => !seen.has(e.id) && seen.add(e.id)).sort((a, b) => a.start - b.start);
+    const csv = CSV_COLS.join(',') + '\n' + all.map(csvRow).join('\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+    a.download = 'baby-tracker.csv';
+    a.click();
+    URL.revokeObjectURL(a.href);
+    btn.disabled = false; btn.textContent = 'Export CSV';
+  });
+
+  // ---- start/stop timer buttons: sleep + nurse ----
+  const sleepBtn = document.getElementById('sleepBtn');
+  const sleepBtnSub = document.getElementById('sleepBtnSub');
+  const nurseBtn = document.getElementById('nurseBtn');
+  const nurseBtnSub = document.getElementById('nurseBtnSub');
+  const nurseSidePick = document.getElementById('nurseSidePick');
+  const NURSE_SIDE_KEY = 'btNurseSide';
+  let nurseSide = (function(){ try { return localStorage.getItem(NURSE_SIDE_KEY) || 'both'; } catch(e) { return 'both'; } })();
+
+  function paintNurseSide() {
+    nurseSidePick.querySelectorAll('button').forEach(b => b.classList.toggle('sel', b.dataset.side === nurseSide));
+  }
+  nurseSidePick.addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    nurseSide = b.dataset.side;
+    try { localStorage.setItem(NURSE_SIDE_KEY, nurseSide); } catch(err) {}
+    if (active.nurse) { active.nurse.side = nurseSide; active.nurse.mt = Date.now(); touch(); }
+    paintNurseSide();
+  });
+
+  function updateActionUI() {
+    if (active.sleep) {
+      sleepBtn.classList.add('running');
+      sleepBtnSub.textContent = 'Tap to wake';
+    } else {
+      sleepBtn.classList.remove('running');
+      sleepBtnSub.textContent = agoOr('sleep', 'Tap to start');
+    }
+    if (active.nurse) {
+      nurseBtn.classList.add('running');
+      nurseBtnSub.textContent = 'Tap to stop';
+      nurseSidePick.style.display = 'flex';
+      nurseSide = active.nurse.side;
+    } else {
+      nurseBtn.classList.remove('running');
+      nurseBtnSub.textContent = agoOr('nurse', 'Tap to start');
+      nurseSidePick.style.display = 'none';
+    }
+    paintNurseSide();
+    if ((active.sleep || active.nurse) && !tick) startTick();
+    if (!active.sleep && !active.nurse && tick) { clearInterval(tick); tick = null; }
+  }
+  function startTick() {
+    tick = setInterval(() => {
+      const now = Date.now();
+      if (active.sleep) sleepBtnSub.textContent = `${fmtShort(now - active.sleep.start)} · tap to wake`;
+      if (active.nurse) nurseBtnSub.textContent = `${fmtShort(now - active.nurse.start)} · tap to stop`;
+      updateStats();
+    }, 1000);
+  }
+
+  // Logging baby activity (nurse/bottle/diaper/solid/med) while the sleep timer
+  // runs means the baby is awake — close the sleep at that event's time. Events
+  // dated before the sleep began leave it running; pump is the mother's
+  // activity and health checks can happen on a sleeping baby, so neither ends it.
+  function autoWake(eventStart) {
+    if (!active.sleep || eventStart <= active.sleep.start) return;
+    const end = Math.min(eventStart, Date.now());
+    entries.push(stamp({ id: 's'+active.sleep.start, type: 'sleep', start: active.sleep.start, end, duration: end - active.sleep.start }));
+    active.sleep = null;
+    updateActionUI();
+  }
+
+  sleepBtn.addEventListener('click', () => {
+    if (!active.sleep) { openSleepModal(); return; }
+    const end = Date.now();
+    entries.push(stamp({ id: 's'+active.sleep.start, type: 'sleep', start: active.sleep.start, end, duration: end - active.sleep.start }));
+    active.sleep = null;
+    render();
+    updateActionUI();
+    touch();
+  });
+
+  nurseBtn.addEventListener('click', () => {
+    if (!active.nurse) { openNurseModal(); return; }
+    const end = Date.now();
+    entries.push(stamp({ id: 'n'+active.nurse.start, type: 'nurse', start: active.nurse.start, end, duration: end - active.nurse.start, side: active.nurse.side }));
+    active.nurse = null;
+    render();
+    updateActionUI();
+    touch();
+  });
+
+  // ---- quick-log modals: bottle / diaper / solid ----
+  function openOverlay(id) { document.getElementById(id).classList.add('open'); }
+  function closeOverlay(id) { document.getElementById(id).classList.remove('open'); }
+  function choiceSetup(containerId, defaultVal) {
+    const el = document.getElementById(containerId);
+    let val = defaultVal;
+    el.querySelectorAll('button').forEach(b => {
+      b.classList.toggle('sel', b.dataset.val === val);
+      b.onclick = () => { val = b.dataset.val; el.querySelectorAll('button').forEach(x => x.classList.toggle('sel', x === b)); };
+    });
+    return { get: () => val };
+  }
+  function showErr(id, msg) { const el = document.getElementById(id); el.textContent = msg; el.style.display = 'block'; }
+  function hideErr(id) { document.getElementById(id).style.display = 'none'; }
+
+  // ---- nurse/sleep modals: start the timer, or log an already-finished session
+  // via a snap-scrolling wheel picker ----
+  function makeWheel(id, values) {
+    const el = document.getElementById(id);
+    const ITEM = 44; // must match .wheel .wv height
+    el.innerHTML = '<div class="pad"></div>' + values.map(v => `<div class="wv">${v}</div>`).join('') + '<div class="pad"></div>';
+    const items = el.querySelectorAll('.wv');
+    let idx = 0;
+    function paint() { items.forEach((it, i) => it.classList.toggle('sel', i === idx)); }
+    el.addEventListener('scroll', () => {
+      const i = Math.max(0, Math.min(values.length - 1, Math.round(el.scrollTop / ITEM)));
+      if (i !== idx) { idx = i; paint(); }
+    });
+    function set(v) { // only works while the wheel is visible (overlay open)
+      idx = Math.max(0, values.indexOf(v));
+      el.scrollTop = idx * ITEM;
+      paint();
+    }
+    return { get: () => values[idx], set };
+  }
+  function range(a, b, step) { const r = []; for (let v = a; v <= b; v += step || 1) r.push(v); return r; }
+  const nurseMinWheel = makeWheel('nurseMinWheel', range(1, 90));
+  const sleepHourWheel = makeWheel('sleepHourWheel', range(0, 16));
+  const sleepMinWheel = makeWheel('sleepMinWheel', range(0, 55, 5));
+
+  // Nurse modal
+  document.getElementById('nurseModalSide').addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    nurseSide = b.dataset.val;
+    try { localStorage.setItem(NURSE_SIDE_KEY, nurseSide); } catch(err) {}
+    setChoiceSel('nurseModalSide', nurseSide);
+  });
+  function openNurseModal() {
+    setChoiceSel('nurseModalSide', nurseSide);
+    openOverlay('nurseOverlay');
+    nurseMinWheel.set(15);
+  }
+  document.getElementById('nurseCancel').addEventListener('click', () => closeOverlay('nurseOverlay'));
+  document.getElementById('nurseOverlay').addEventListener('click', (e) => { if (e.target.id === 'nurseOverlay') closeOverlay('nurseOverlay'); });
+  document.getElementById('nurseStartTimer').addEventListener('click', () => {
+    autoWake(Date.now());
+    active.nurse = { start: Date.now(), mt: Date.now(), side: nurseSide };
+    closeOverlay('nurseOverlay');
+    updateActionUI();
+    touch();
+  });
+  document.getElementById('nurseLogSave').addEventListener('click', () => {
+    const end = Date.now();
+    const start = end - nurseMinWheel.get() * 60000;
+    autoWake(start);
+    entries.push(stamp({ id: 'n'+start, type: 'nurse', start, end, duration: end - start, side: nurseSide }));
+    closeOverlay('nurseOverlay');
+    touch(); render();
+  });
+
+  // Sleep modal
+  function openSleepModal() {
+    hideErr('sleepErr');
+    openOverlay('sleepOverlay');
+    sleepHourWheel.set(0);
+    sleepMinWheel.set(30);
+  }
+  document.getElementById('sleepCancel').addEventListener('click', () => closeOverlay('sleepOverlay'));
+  document.getElementById('sleepOverlay').addEventListener('click', (e) => { if (e.target.id === 'sleepOverlay') closeOverlay('sleepOverlay'); });
+  document.getElementById('sleepStartTimer').addEventListener('click', () => {
+    active.sleep = { start: Date.now(), mt: Date.now() };
+    closeOverlay('sleepOverlay');
+    updateActionUI();
+    touch();
+  });
+  document.getElementById('sleepLogSave').addEventListener('click', () => {
+    const duration = sleepHourWheel.get() * 3600000 + sleepMinWheel.get() * 60000;
+    if (duration <= 0) { showErr('sleepErr', 'Pick a duration'); return; }
+    const end = Date.now();
+    const start = end - duration;
+    entries.push(stamp({ id: 's'+start, type: 'sleep', start, end, duration }));
+    closeOverlay('sleepOverlay');
+    touch(); render();
+  });
+
+  // Bottle
+  const bottleMilk = choiceSetup('bottleMilkChoice', 'formula');
+  document.getElementById('bottleBtn').addEventListener('click', () => {
+    document.getElementById('bottleTime').value = timeInputVal(Date.now());
+    document.getElementById('bottleAmount').value = '';
+    document.getElementById('bottleNote').value = '';
+    hideErr('bottleErr');
+    openOverlay('bottleOverlay');
+  });
+  document.getElementById('bottleCancel').addEventListener('click', () => closeOverlay('bottleOverlay'));
+  document.getElementById('bottleOverlay').addEventListener('click', (e) => { if (e.target.id === 'bottleOverlay') closeOverlay('bottleOverlay'); });
+  document.getElementById('bottleSave').addEventListener('click', () => {
+    const amount = parseFloat(document.getElementById('bottleAmount').value);
+    if (!amount || amount <= 0) { showErr('bottleErr', 'Enter an amount greater than 0'); return; }
+    const start = applyTimeBack(document.getElementById('bottleTime').value);
+    if (start === null) { showErr('bottleErr', 'Time must be HH:MM'); return; }
+    const note = document.getElementById('bottleNote').value.trim();
+    autoWake(start);
+    entries.push(stamp({ id: 'b'+Date.now(), type: 'bottle', start, amount, unit: document.getElementById('bottleUnit').value, milk: bottleMilk.get(), note: note || undefined }));
+    touch(); render();
+    closeOverlay('bottleOverlay');
+  });
+
+  // Diaper
+  const diaperKind = choiceSetup('diaperKindChoice', 'wet');
+  document.getElementById('diaperBtn').addEventListener('click', () => {
+    document.getElementById('diaperTime').value = timeInputVal(Date.now());
+    document.getElementById('diaperNote').value = '';
+    hideErr('diaperErr');
+    openOverlay('diaperOverlay');
+  });
+  document.getElementById('diaperCancel').addEventListener('click', () => closeOverlay('diaperOverlay'));
+  document.getElementById('diaperOverlay').addEventListener('click', (e) => { if (e.target.id === 'diaperOverlay') closeOverlay('diaperOverlay'); });
+  document.getElementById('diaperSave').addEventListener('click', () => {
+    const start = applyTimeBack(document.getElementById('diaperTime').value);
+    if (start === null) { showErr('diaperErr', 'Time must be HH:MM'); return; }
+    const note = document.getElementById('diaperNote').value.trim();
+    autoWake(start);
+    entries.push(stamp({ id: 'd'+Date.now(), type: 'diaper', start, kind: diaperKind.get(), note: note || undefined }));
+    touch(); render();
+    closeOverlay('diaperOverlay');
+  });
+
+  // Solid
+  document.getElementById('solidBtn').addEventListener('click', () => {
+    document.getElementById('solidTime').value = timeInputVal(Date.now());
+    document.getElementById('solidFood').value = '';
+    hideErr('solidErr');
+    openOverlay('solidOverlay');
+  });
+  document.getElementById('solidCancel').addEventListener('click', () => closeOverlay('solidOverlay'));
+  document.getElementById('solidOverlay').addEventListener('click', (e) => { if (e.target.id === 'solidOverlay') closeOverlay('solidOverlay'); });
+  document.getElementById('solidSave').addEventListener('click', () => {
+    const food = document.getElementById('solidFood').value.trim();
+    if (!food) { showErr('solidErr', 'Enter what they ate'); return; }
+    const start = applyTimeBack(document.getElementById('solidTime').value);
+    if (start === null) { showErr('solidErr', 'Time must be HH:MM'); return; }
+    autoWake(start);
+    entries.push(stamp({ id: 'f'+Date.now(), type: 'solid', start, food }));
+    touch(); render();
+    closeOverlay('solidOverlay');
+  });
+
+  // Pump
+  const pumpSide = choiceSetup('pumpSideChoice', 'both');
+  document.getElementById('pumpBtn').addEventListener('click', () => {
+    document.getElementById('pumpTime').value = timeInputVal(Date.now());
+    document.getElementById('pumpAmount').value = '';
+    document.getElementById('pumpNote').value = '';
+    hideErr('pumpErr');
+    openOverlay('pumpOverlay');
+  });
+  document.getElementById('pumpCancel').addEventListener('click', () => closeOverlay('pumpOverlay'));
+  document.getElementById('pumpOverlay').addEventListener('click', (e) => { if (e.target.id === 'pumpOverlay') closeOverlay('pumpOverlay'); });
+  document.getElementById('pumpSave').addEventListener('click', () => {
+    const amount = parseFloat(document.getElementById('pumpAmount').value);
+    if (!amount || amount <= 0) { showErr('pumpErr', 'Enter an amount greater than 0'); return; }
+    const start = applyTimeBack(document.getElementById('pumpTime').value);
+    if (start === null) { showErr('pumpErr', 'Time must be HH:MM'); return; }
+    const note = document.getElementById('pumpNote').value.trim();
+    entries.push(stamp({ id: 'p'+Date.now(), type: 'pump', start, amount, unit: document.getElementById('pumpUnit').value, side: pumpSide.get(), note: note || undefined }));
+    touch(); render();
+    closeOverlay('pumpOverlay');
+  });
+
+  // Meds (remembers the last name — most med logging is the same daily drops)
+  const LAST_MED_KEY = 'btLastMed_v1';
+  document.getElementById('medBtn').addEventListener('click', () => {
+    document.getElementById('medTime').value = timeInputVal(Date.now());
+    let last = ''; try { last = localStorage.getItem(LAST_MED_KEY) || ''; } catch(e) {}
+    document.getElementById('medName').value = last;
+    document.getElementById('medNote').value = '';
+    hideErr('medErr');
+    openOverlay('medOverlay');
+  });
+  document.getElementById('medCancel').addEventListener('click', () => closeOverlay('medOverlay'));
+  document.getElementById('medOverlay').addEventListener('click', (e) => { if (e.target.id === 'medOverlay') closeOverlay('medOverlay'); });
+  document.getElementById('medSave').addEventListener('click', () => {
+    const name = document.getElementById('medName').value.trim();
+    if (!name) { showErr('medErr', 'Enter what was given'); return; }
+    const start = applyTimeBack(document.getElementById('medTime').value);
+    if (start === null) { showErr('medErr', 'Time must be HH:MM'); return; }
+    try { localStorage.setItem(LAST_MED_KEY, name); } catch(e) {}
+    const note = document.getElementById('medNote').value.trim();
+    autoWake(start);
+    entries.push(stamp({ id: 'm'+Date.now(), type: 'med', start, name, note: note || undefined }));
+    touch(); render();
+    closeOverlay('medOverlay');
+  });
+
+  // Health (temperature / weight / length — any subset)
+  document.getElementById('healthBtn').addEventListener('click', () => {
+    document.getElementById('healthTime').value = timeInputVal(Date.now());
+    for (const id of ['healthTemp', 'healthWeight', 'healthLength', 'healthNote']) document.getElementById(id).value = '';
+    hideErr('healthErr');
+    openOverlay('healthOverlay');
+  });
+  document.getElementById('healthCancel').addEventListener('click', () => closeOverlay('healthOverlay'));
+  document.getElementById('healthOverlay').addEventListener('click', (e) => { if (e.target.id === 'healthOverlay') closeOverlay('healthOverlay'); });
+  document.getElementById('healthSave').addEventListener('click', () => {
+    const num = (id) => { const v = parseFloat(document.getElementById(id).value); return isNaN(v) ? undefined : v; };
+    const temp = num('healthTemp'), weight = num('healthWeight'), length = num('healthLength');
+    if (temp === undefined && weight === undefined && length === undefined) { showErr('healthErr', 'Fill in at least one measurement'); return; }
+    const start = applyTimeBack(document.getElementById('healthTime').value);
+    if (start === null) { showErr('healthErr', 'Time must be HH:MM'); return; }
+    const note = document.getElementById('healthNote').value.trim();
+    entries.push(stamp({ id: 'h'+Date.now(), type: 'health', start, temp, weight, length, note: note || undefined }));
+    touch(); render();
+    closeOverlay('healthOverlay');
+  });
+
+  // Bath (instantaneous, note only)
+  document.getElementById('bathBtn').addEventListener('click', () => {
+    document.getElementById('bathTime').value = timeInputVal(Date.now());
+    document.getElementById('bathNote').value = '';
+    hideErr('bathErr');
+    openOverlay('bathOverlay');
+  });
+  document.getElementById('bathCancel').addEventListener('click', () => closeOverlay('bathOverlay'));
+  document.getElementById('bathOverlay').addEventListener('click', (e) => { if (e.target.id === 'bathOverlay') closeOverlay('bathOverlay'); });
+  document.getElementById('bathSave').addEventListener('click', () => {
+    const start = applyTimeBack(document.getElementById('bathTime').value);
+    if (start === null) { showErr('bathErr', 'Time must be HH:MM'); return; }
+    const note = document.getElementById('bathNote').value.trim();
+    autoWake(start); // a bath definitely means the baby is awake
+    entries.push(stamp({ id: 'w'+Date.now(), type: 'bath', start, note: note || undefined }));
+    touch(); render();
+    closeOverlay('bathOverlay');
+  });
+
+  // ---- edit modal (type-aware) ----
+  const editOverlay = document.getElementById('editOverlay');
+  const editDate = document.getElementById('editDate');
+  const editTime = document.getElementById('editTime');
+  const editEndTime = document.getElementById('editEndTime');
+  const editNote = document.getElementById('editNote');
+  const editAmount = document.getElementById('editAmount');
+  const editUnit = document.getElementById('editUnit');
+  const editFood = document.getElementById('editFood');
+  let editId = null; // entry id (not index): sync merges can reorder while the dialog is open
+  let editSide = null, editMilk = null, editKind = null;
+
+  const wraps = ['editEndWrap','editSideWrap','editAmountWrap','editMilkWrap','editKindWrap','editFoodWrap','editMedWrap','editHealthWrap'];
+  function showWraps(ids) {
+    wraps.forEach(id => document.getElementById(id).style.display = ids.includes(id) ? 'block' : 'none');
+  }
+  function setChoiceSel(containerId, val) {
+    document.getElementById(containerId).querySelectorAll('button').forEach(b => b.classList.toggle('sel', b.dataset.val === val));
+  }
+  document.getElementById('editSideChoice').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) { editSide = b.dataset.val; setChoiceSel('editSideChoice', editSide); } });
+  document.getElementById('editMilkChoice').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) { editMilk = b.dataset.val; setChoiceSel('editMilkChoice', editMilk); } });
+  document.getElementById('editKindChoice').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) { editKind = b.dataset.val; setChoiceSel('editKindChoice', editKind); } });
+
+  function editRow(id) {
+    const e = entries.find(x => x.id === id);
+    if (!e) return;
+    editId = id;
+    document.getElementById('editTitle').textContent = `Edit ${entryTypeLabel(e).toLowerCase()}`;
+    editDate.value = dateInputVal(e.start);
+    editTime.value = timeInputVal(e.start);
+    editNote.value = e.note || '';
+    hideErr('editErr');
+
+    if (e.type === 'sleep' || e.type === 'nurse') {
+      editEndTime.value = timeInputVal(e.end);
+      if (e.type === 'nurse') { editSide = e.side; setChoiceSel('editSideChoice', editSide); showWraps(['editEndWrap','editSideWrap']); }
+      else showWraps(['editEndWrap']);
+    } else if (e.type === 'bottle') {
+      editAmount.value = e.amount; editUnit.value = e.unit; editMilk = e.milk || 'formula'; setChoiceSel('editMilkChoice', editMilk);
+      showWraps(['editAmountWrap','editMilkWrap']);
+    } else if (e.type === 'pump') {
+      editAmount.value = e.amount; editUnit.value = e.unit; editSide = e.side || 'both'; setChoiceSel('editSideChoice', editSide);
+      showWraps(['editAmountWrap','editSideWrap']);
+    } else if (e.type === 'diaper') {
+      editKind = e.kind; setChoiceSel('editKindChoice', editKind);
+      showWraps(['editKindWrap']);
+    } else if (e.type === 'solid') {
+      editFood.value = e.food || '';
+      showWraps(['editFoodWrap']);
+    } else if (e.type === 'med') {
+      document.getElementById('editMedName').value = e.name || '';
+      showWraps(['editMedWrap']);
+    } else if (e.type === 'health') {
+      document.getElementById('editHealthTemp').value = e.temp ?? '';
+      document.getElementById('editHealthWeight').value = e.weight != null ? toGrams(e.weight) : '';
+      document.getElementById('editHealthLength').value = e.length ?? '';
+      showWraps(['editHealthWrap']);
+    } else {
+      showWraps([]);
+    }
+    editOverlay.classList.add('open');
+  }
+  function closeEdit() { editOverlay.classList.remove('open'); editId = null; }
+  document.getElementById('editCancel').addEventListener('click', closeEdit);
+  editOverlay.addEventListener('click', (e) => { if (e.target === editOverlay) closeEdit(); });
+  document.getElementById('editSave').addEventListener('click', () => {
+    const e = entries.find(x => x.id === editId);
+    if (!e) { closeEdit(); return; }
+    const newStart = combineDateTime(editDate.value, editTime.value);
+    if (newStart === null) { showErr('editErr', 'Enter a valid date and start time (HH:MM)'); return; }
+    e.start = newStart;
+
+    if (e.type === 'sleep' || e.type === 'nurse') {
+      // end lands on the start's (possibly changed) day; an earlier clock time
+      // means the session crossed midnight
+      let newEnd = applyTimeToDate(newStart, editEndTime.value);
+      if (newEnd === null) { showErr('editErr', 'End time must be HH:MM'); return; }
+      if (newEnd < e.start) newEnd += 24*3600000;
+      if (newEnd <= e.start) { showErr('editErr', 'End time must be after start'); return; }
+      e.end = newEnd;
+      e.duration = e.end - e.start;
+      if (e.type === 'nurse') e.side = editSide;
+    } else if (e.type === 'bottle') {
+      const amt = parseFloat(editAmount.value);
+      if (!amt || amt <= 0) { showErr('editErr', 'Enter an amount greater than 0'); return; }
+      e.amount = amt; e.unit = editUnit.value; e.milk = editMilk;
+    } else if (e.type === 'pump') {
+      const amt = parseFloat(editAmount.value);
+      if (!amt || amt <= 0) { showErr('editErr', 'Enter an amount greater than 0'); return; }
+      e.amount = amt; e.unit = editUnit.value; e.side = editSide;
+    } else if (e.type === 'diaper') {
+      e.kind = editKind;
+    } else if (e.type === 'solid') {
+      const food = editFood.value.trim();
+      if (!food) { showErr('editErr', 'Enter what they ate'); return; }
+      e.food = food;
+    } else if (e.type === 'med') {
+      const name = document.getElementById('editMedName').value.trim();
+      if (!name) { showErr('editErr', 'Enter what was given'); return; }
+      e.name = name;
+    } else if (e.type === 'health') {
+      const num = (id) => { const v = parseFloat(document.getElementById(id).value); return isNaN(v) ? undefined : v; };
+      const temp = num('editHealthTemp'), weight = num('editHealthWeight'), length = num('editHealthLength');
+      if (temp === undefined && weight === undefined && length === undefined) { showErr('editErr', 'Fill in at least one measurement'); return; }
+      e.temp = temp; e.weight = weight; e.length = length;
+    }
+    const note = editNote.value.trim();
+    if (note) e.note = note; else delete e.note;
+    e.mt = Date.now(); // per-entry conflict resolution: newest edit wins
+    touch();
+    render();
+    closeEdit();
+  });
+
+  // ---- alerts & push notifications ----
+  // Rules are PER DEVICE: stored locally (btAlertPrefs_v1) and attached to this
+  // device's push subscription, where the worker cron evaluates them per device.
+  // They are also mirrored into the legacy shared `alerts` sync field so a
+  // not-yet-updated worker keeps sending until it's redeployed.
+  const PREFS_KEY = 'btAlertPrefs_v1';
+  let alertPrefs = null; // initialized after load() so first run can seed from the old shared config
+  function normPrefs(p) {
+    const d = defaultAlerts();
+    if (p) for (const k of Object.keys(d)) if (p[k]) d[k] = { ...d[k], ...p[k] };
+    return d;
+  }
+  function savePrefs() {
+    try { localStorage.setItem(PREFS_KEY, JSON.stringify(alertPrefs)); } catch(e) {}
+    alerts = JSON.parse(JSON.stringify(alertPrefs)); // legacy dual-write (see above)
+    bumpAlerts();
+    let pushOn = false;
+    try { pushOn = !!localStorage.getItem(PUSH_FLAG); } catch(e) {}
+    if (pushOn && pushSupported() && Notification.permission === 'granted') subscribePush().catch(() => {});
+  }
+  const RULES = [
+    { key: 'feed',   on: 'alFeedOn',   min: 'alFeedMin',   crit: 'alFeedCrit' },
+    { key: 'diaper', on: 'alDiaperOn', min: 'alDiaperMin', crit: 'alDiaperCrit' },
+    { key: 'awake',  on: 'alAwakeOn',  min: 'alAwakeMin',  crit: 'alAwakeCrit' },
+    { key: 'sleep',  on: 'alSleepOn',  min: 'alSleepMin',  crit: 'alSleepCrit' },
+  ];
+  const DUR_OPTS = [30, 45, 60, 90, 120, 150, 180, 210, 240, 300, 360, 480, 720];
+  const CRIT_OPTS = [['low', 'Quiet'], ['normal', 'Normal'], ['high', 'Nag'], ['alarm', 'Alarm']];
+  function durLabel(min) {
+    const h = Math.floor(min / 60), m = min % 60;
+    return h > 0 ? (m ? `${h}h ${m}m` : `${h}h`) : `${m}m`;
+  }
+  for (const r of RULES) {
+    const sel = document.getElementById(r.min);
+    sel.innerHTML = DUR_OPTS.map(v => `<option value="${v}">${durLabel(v)}</option>`).join('');
+    sel.addEventListener('change', () => { alertPrefs[r.key].min = +sel.value; savePrefs(); });
+    const crit = document.getElementById(r.crit);
+    crit.innerHTML = CRIT_OPTS.map(([v, l]) => `<option value="${v}">${l}</option>`).join('');
+    crit.addEventListener('change', () => { alertPrefs[r.key].crit = crit.value; savePrefs(); });
+    document.getElementById(r.on).addEventListener('change', (e) => { alertPrefs[r.key].on = e.target.checked; savePrefs(); });
+  }
+
+  // quiet hours: per-device window during which nothing is sent to this device
+  const HOUR_OPTS = Array.from({ length: 24 }, (_, h) => `${String(h).padStart(2, '0')}:00`);
+  function quietCfg() {
+    if (!alertPrefs.quiet) alertPrefs.quiet = defaultAlerts().quiet;
+    return alertPrefs.quiet;
+  }
+  for (const id of ['alQuietFrom', 'alQuietTo'])
+    document.getElementById(id).innerHTML = HOUR_OPTS.map(h => `<option>${h}</option>`).join('');
+  document.getElementById('alQuietOn').addEventListener('change', (e) => {
+    const q = quietCfg(); q.on = e.target.checked;
+    q.tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    savePrefs();
+  });
+  document.getElementById('alQuietFrom').addEventListener('change', (e) => { quietCfg().from = e.target.value; savePrefs(); });
+  document.getElementById('alQuietTo').addEventListener('change', (e) => { quietCfg().to = e.target.value; savePrefs(); });
+
+  function paintAlertRules() {
+    if (!alertPrefs) return;
+    for (const r of RULES) {
+      document.getElementById(r.on).checked = !!alertPrefs[r.key].on;
+      document.getElementById(r.min).value = String(alertPrefs[r.key].min);
+      document.getElementById(r.crit).value = alertPrefs[r.key].crit || 'normal';
+    }
+    const q = quietCfg();
+    document.getElementById('alQuietOn').checked = !!q.on;
+    document.getElementById('alQuietFrom').value = q.from;
+    document.getElementById('alQuietTo').value = q.to;
+  }
+
+  // ---- ringing alarm: rules set to crit 'alarm' ring like a timer on any
+  // device where the app is open (looping tone + full-screen stop overlay).
+  // Push still goes out server-side for closed devices. ----
+  const ALARM_SNOOZE_MS = 15 * 60000; // Stop silences; re-rings if still not logged
+  let audioCtx = null;
+  document.addEventListener('pointerdown', () => { // browsers require a gesture before audio
+    if (!audioCtx) { try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) {} }
+    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+  });
+  function alarmBeep() {
+    if (!audioCtx || audioCtx.state !== 'running') return;
+    try {
+      const t = audioCtx.currentTime;
+      for (const [f, at] of [[880, 0], [660, 0.22]]) {
+        const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+        o.frequency.value = f; o.type = 'square';
+        g.gain.setValueAtTime(0.0001, t + at);
+        g.gain.exponentialRampToValueAtTime(0.4, t + at + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + at + 0.18);
+        o.connect(g); g.connect(audioCtx.destination);
+        o.start(t + at); o.stop(t + at + 0.2);
+      }
+    } catch(e) {}
+  }
+  let alarmRinging = false, alarmBeeper = null;
+  const alarmSnooze = {}; // rule key -> snoozed-until ts
+  function localQuiet(now) { // same window logic as the worker
+    const q = alertPrefs && alertPrefs.quiet;
+    if (!q || !q.on) return false;
+    let cur;
+    try { cur = new Date(now).toLocaleTimeString('en-GB', { timeZone: q.tz || 'Europe/Oslo', hour12: false, hour: '2-digit', minute: '2-digit' }); } catch(e) { return false; }
+    return q.from <= q.to ? cur >= q.from && cur < q.to : cur >= q.from || cur < q.to;
+  }
+  function dueAlarmRules(now) {
+    if (!alertPrefs) return [];
+    const a = alertPrefs;
+    const over = (t, r) => r && r.on && r.crit === 'alarm' && t !== null && now - t > r.min * 60000;
+    const due = [];
+    if (!active.nurse) { const t = latestFeedTime(); if (over(t, a.feed)) due.push({ key: 'feed', body: `🍼 No feed for ${fmtShort(now - t)}` }); }
+    { const t = latestDiaperTime(); if (over(t, a.diaper)) due.push({ key: 'diaper', body: `No diaper change for ${fmtShort(now - t)}` }); }
+    if (!active.sleep) { const t = lastOfType('sleep'); if (over(t, a.awake)) due.push({ key: 'awake', body: `☀️ Awake for ${fmtShort(now - t)}` }); }
+    if (active.sleep) { const t = active.sleep.start; if (over(t, a.sleep)) due.push({ key: 'sleep', body: `😴 Asleep for ${fmtShort(now - t)}` }); }
+    return due;
+  }
+  function evalLocalAlarms() {
+    const now = Date.now();
+    const due = dueAlarmRules(now);
+    for (const k of Object.keys(alarmSnooze)) if (!due.some(d => d.key === k)) delete alarmSnooze[k]; // cleared -> next crossing rings fresh
+    const ringing = localQuiet(now) ? [] : due.filter(d => !(alarmSnooze[d.key] > now));
+    if (ringing.length) {
+      document.getElementById('alarmMsgs').innerHTML = ringing.map(d => esc(d.body)).join('<br>');
+      if (!alarmRinging) {
+        alarmRinging = true;
+        openOverlay('alarmOverlay');
+        const buzz = () => { alarmBeep(); if (navigator.vibrate) try { navigator.vibrate([400, 150, 400]); } catch(e) {} };
+        buzz();
+        alarmBeeper = setInterval(buzz, 1500);
+      }
+    } else if (alarmRinging) {
+      stopAlarm(false);
+    }
+  }
+  function stopAlarm(snooze) {
+    if (snooze) { const until = Date.now() + ALARM_SNOOZE_MS; for (const d of dueAlarmRules(Date.now())) alarmSnooze[d.key] = until; }
+    alarmRinging = false;
+    if (alarmBeeper) { clearInterval(alarmBeeper); alarmBeeper = null; }
+    closeOverlay('alarmOverlay');
+  }
+  document.getElementById('alarmStop').addEventListener('click', () => stopAlarm(true));
+  document.getElementById('alarmOverlay').addEventListener('click', (e) => { if (e.target.id === 'alarmOverlay') stopAlarm(true); });
+
+  // server-side visibility: when did the cron last run, is this device registered?
+  async function updateSrvStatus() {
+    const el = document.getElementById('srvStatus');
+    el.textContent = '';
+    if (!room) return;
+    try {
+      let endpoint = null;
+      if (pushSupported()) {
+        // getRegistration() resolves even when no SW is registered; .ready would hang forever
+        try { const reg = await navigator.serviceWorker.getRegistration(); endpoint = (reg && (await reg.pushManager.getSubscription())?.endpoint) || null; } catch(e) {}
+      }
+      const r = await fetch(`${SYNC_URL}/status/${room}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ endpoint }), signal: AbortSignal.timeout(8000) });
+      if (!r.ok) throw 0;
+      const d = await r.json();
+      const cron = d.lastCron ? fmtShort(Date.now() - d.lastCron) + ' ago' : 'never';
+      let msg = `Server alert check: ${cron} · ${d.devices} device${d.devices === 1 ? '' : 's'} registered`;
+      if (endpoint) msg += d.subscribed ? ' · this device ✓' : ' · ⚠ this device is NOT registered — toggle notifications off and on';
+      const healthy = d.lastCron && Date.now() - d.lastCron < 45 * 60000 && (!endpoint || d.subscribed);
+      el.className = 'pushstatus' + (healthy ? ' ok' : ' warn');
+      el.textContent = msg;
+    } catch(e) {
+      el.className = 'pushstatus warn';
+      el.textContent = 'Server status unavailable — sync worker may be old or unreachable.';
+    }
+  }
+
+  // baby identity (name + birth date + sex) — synced, shared by all devices in the room
+  const babyNameInput = document.getElementById('babyName');
+  const babyBornInput = document.getElementById('babyBorn');
+  const babySexSel = document.getElementById('babySex');
+  function bumpBaby() {
+    babyRev = Date.now();
+    touch();
+    paintBaby();
+    updateStats(); // age thresholds may have moved
+    renderGrowth(); // birth date / sex drive the weight chart
+  }
+  babyNameInput.addEventListener('change', () => { baby.name = babyNameInput.value.trim(); bumpBaby(); });
+  babyBornInput.addEventListener('change', () => {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(babyBornInput.value)) { baby.born = babyBornInput.value; bumpBaby(); }
+  });
+  babySexSel.addEventListener('change', () => { baby.sex = babySexSel.value; bumpBaby(); });
+
+  // switch baby / sign out: the log lives safely on the server per room — this
+  // only clears this device's local copy and lets you sign into another room
+  document.getElementById('switchBaby').addEventListener('click', async () => {
+    const msg = syncOk === true
+      ? `Sign out on this device? ${baby.name ? baby.name + "'s" : 'The'} log stays safely synced on the server — sign back in anytime (add a baby name for a different baby's log).`
+      : '⚠ This device is NOT currently synced — any unsynced changes on it would be lost. Sign out anyway?';
+    if (!confirm(msg)) return;
+    try { // stop this room's push alerts reaching this device
+      if (localStorage.getItem(PUSH_FLAG) && pushSupported()) {
+        const reg = await navigator.serviceWorker.ready;
+        const sub = await reg.pushManager.getSubscription();
+        if (sub) {
+          await fetch(`${SYNC_URL}/unsubscribe/${room}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ endpoint: sub.endpoint }) });
+          await sub.unsubscribe();
+        }
+      }
+    } catch(e) {}
+    try {
+      localStorage.removeItem(AUTH_KEY);
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(PUSH_FLAG);
+    } catch(e) {}
+    location.reload();
+  });
+
+  // room id doubles as the API credential for integrations (POST /log, GET /summary)
+  document.getElementById('copyRoom').addEventListener('click', async (e) => {
+    e.preventDefault();
+    if (!room) return;
+    try {
+      await navigator.clipboard.writeText(room);
+      e.target.textContent = 'copied ✓';
+      setTimeout(() => { e.target.textContent = 'copy room id'; }, 2000);
+    } catch(err) { prompt('Room id (copy manually):', room); }
+  });
+
+  // per-device name stamped onto entries this device logs
+  const deviceNameInput = document.getElementById('deviceName');
+  deviceNameInput.addEventListener('change', () => {
+    deviceName = deviceNameInput.value.trim();
+    try { localStorage.setItem(NAME_KEY, deviceName); } catch(e) {}
+  });
+
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  const pushSupported = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+  const pushStatus = document.getElementById('pushStatus');
+  const pushToggle = document.getElementById('pushToggle');
+  const pushTest = document.getElementById('pushTest');
+
+  function b64uToU8(s) {
+    const b = s.replace(/-/g, '+').replace(/_/g, '/');
+    return Uint8Array.from(atob(b + '='.repeat((4 - b.length % 4) % 4)), c => c.charCodeAt(0));
+  }
+  function setPushStatus(cls, msg) { pushStatus.className = 'pushstatus' + (cls ? ' ' + cls : ''); pushStatus.textContent = msg; }
+
+  function updatePushUI() {
+    pushTest.style.display = 'none';
+    if (!pushSupported()) {
+      pushToggle.style.display = 'none';
+      if (isIOS && !isStandalone()) setPushStatus('warn', 'On iPhone: tap Share → “Add to Home Screen”, then open the app from its icon to enable notifications.');
+      else setPushStatus('warn', 'Notifications are not supported in this browser.');
+      return;
+    }
+    pushToggle.style.display = '';
+    if (localStorage.getItem(PUSH_FLAG) && Notification.permission === 'granted') {
+      setPushStatus('ok', 'Notifications are ON for this device ✓');
+      pushToggle.textContent = 'Disable notifications';
+      pushTest.style.display = '';
+    } else if (Notification.permission === 'denied') {
+      setPushStatus('warn', 'Notifications are blocked — allow them for this site in your browser/system settings, then try again.');
+      pushToggle.textContent = 'Enable notifications';
+    } else {
+      setPushStatus('', 'Get reminders on this phone even when the app is closed.');
+      pushToggle.textContent = 'Enable notifications';
+    }
+  }
+
+  // Public VAPID key: the self-hosted server serves its key at /vapid (mirrors
+  // the pelvic trainer) so no key is baked in; github.io keeps the legacy
+  // embedded key for the old worker.
+  async function vapidKey() {
+    if (!SELF_HOSTED) return VAPID_PUBLIC;
+    try { const c = localStorage.getItem('btVapid_v1'); if (c) return c; } catch(e) {}
+    const d = await (await fetch(`${SYNC_URL}/vapid`)).json();
+    try { localStorage.setItem('btVapid_v1', d.publicKey); } catch(e) {}
+    return d.publicKey;
+  }
+
+  async function subscribePush() {
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64uToU8(await vapidKey()) });
+    const r = await fetch(`${SYNC_URL}/subscribe/${room}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      // this device's alert prefs ride along so the worker evaluates them per device
+      body: JSON.stringify({ ...sub.toJSON(), alerts: alertPrefs || undefined }),
+    });
+    if (!r.ok) throw new Error('subscribe failed');
+  }
+
+  pushToggle.addEventListener('click', async () => {
+    if (!room) return;
+    try {
+      if (localStorage.getItem(PUSH_FLAG) && Notification.permission === 'granted') {
+        const reg = await navigator.serviceWorker.ready;
+        const sub = await reg.pushManager.getSubscription();
+        if (sub) {
+          await fetch(`${SYNC_URL}/unsubscribe/${room}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ endpoint: sub.endpoint }),
+          });
+          await sub.unsubscribe();
+        }
+        localStorage.removeItem(PUSH_FLAG);
+      } else {
+        const perm = await Notification.requestPermission();
+        if (perm !== 'granted') { updatePushUI(); return; }
+        await subscribePush();
+        localStorage.setItem(PUSH_FLAG, '1');
+      }
+    } catch (e) {
+      setPushStatus('warn', 'Could not update notifications — check your connection and try again.');
+      return;
+    }
+    updatePushUI();
+  });
+
+  pushTest.addEventListener('click', async () => {
+    pushTest.disabled = true;
+    try {
+      const r = await fetch(`${SYNC_URL}/test/${room}`, { method: 'POST' });
+      const d = await r.json();
+      setPushStatus('ok', `Test sent to ${d.devices} device${d.devices === 1 ? '' : 's'} (status ${d.statuses.join(', ')}). It can take a few seconds to appear.`);
+    } catch (e) {
+      setPushStatus('warn', 'Test failed — check your connection.');
+    }
+    pushTest.disabled = false;
+  });
+
+  // Keep the server's copy of this device's subscription fresh (push services
+  // can rotate subscriptions).
+  async function ensurePush() {
+    if (!room || !pushSupported() || !localStorage.getItem(PUSH_FLAG) || Notification.permission !== 'granted') return;
+    try { await subscribePush(); } catch (e) {}
+  }
+
+  document.getElementById('alertsBtn').addEventListener('click', () => {
+    babyNameInput.value = baby.name;
+    babyBornInput.value = baby.born;
+    babySexSel.value = baby.sex || '';
+    deviceNameInput.value = deviceName;
+    paintAlertRules();
+    updatePushUI();
+    updateSrvStatus();
+    openOverlay('alertsOverlay');
+  });
+  document.getElementById('alertsClose').addEventListener('click', () => closeOverlay('alertsOverlay'));
+  document.getElementById('alertsOverlay').addEventListener('click', (e) => { if (e.target.id === 'alertsOverlay') closeOverlay('alertsOverlay'); });
+
+  // ---- init: restore state, then sync ----
+  load();
+  alertPrefs = (function(){ // per-device rules; first run seeds from the old shared config
+    try { const raw = localStorage.getItem(PREFS_KEY); if (raw) return normPrefs(JSON.parse(raw)); } catch(e) {}
+    const seeded = normPrefs(alerts);
+    try { localStorage.setItem(PREFS_KEY, JSON.stringify(seeded)); } catch(e) {}
+    return seeded;
+  })();
+  updateActionUI();
+  paintBaby();
+  render();
+  setSyncNote(syncOk);
+  if (!room) openOverlay('loginOverlay');
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').then(ensurePush).catch(() => {});
+  pull();
+  // no polling while hidden — visibilitychange pulls the moment we're back
+  setInterval(() => { if (!document.hidden) pull(); }, POLL_MS);
+  setInterval(() => { updateStats(); renderTimeline(); evalLocalAlarms(); paintBaby(); }, 15000); // paintBaby: age rolls over at midnight
+  evalLocalAlarms();
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) pull(); });
+  window.addEventListener('online', pull);
+</script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+services:
+  baby:
+    build: .
+    container_name: baby
+    restart: unless-stopped
+    environment:
+      - TZ=Europe/Oslo
+    # BABY_VAPID_JWK + PELVIC_VAPID_JWK — created on the host, never committed
+    # (see the private homelab run-book). Deploys `git reset --hard`, so .env
+    # being untracked is what keeps it alive.
+    env_file: .env
+    ports:
+      - "10700:8080" # host:container — fronted by the reverse proxy (see the private homelab run-book)
+    volumes:
+      - /apps/baby-data:/data # state lives OUTSIDE the git clone; owned by uid 1000 (node)

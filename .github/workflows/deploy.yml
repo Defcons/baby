@@ -1,0 +1,42 @@
+name: Deploy to home server
+
+# CI joins the tailnet and deploys over SSH. The server-side key is
+# command-restricted, so the script below is effectively documentation —
+# the host runs its own pinned deploy script regardless.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v3
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret:    ${{ secrets.TS_OAUTH_SECRET }}
+          tags:            tag:ci
+          version:         latest
+
+      - name: Deploy via SSH over Tailscale
+        uses: appleboy/ssh-action@v1
+        with:
+          host:     ${{ secrets.DEPLOY_HOST }}
+          port:     ${{ secrets.DEPLOY_PORT }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key:      ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            set -euo pipefail
+            cd /apps/baby
+            git fetch origin
+            git reset --hard origin/main
+            docker compose build
+            docker compose up -d
+            echo "baby deploy complete ($(git rev-parse --short HEAD))"

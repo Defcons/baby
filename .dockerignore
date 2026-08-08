@@ -1,0 +1,13 @@
+.git
+.github
+backups
+data
+node_modules
+homeassistant
+docs
+*.md
+.env
+.gitignore
+.dockerignore
+**/wrangler.toml
+**/.wrangler
