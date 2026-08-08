@@ -4,7 +4,7 @@
      item = repro steps + pass criteria, runnable cold. Once CONFIRMED, graduate the fact
      (KnowledgeBase / the maps) and DELETE the item — this file holds only the unconfirmed. -->
 
-_Updated 2026-08-08 (selfhost branch). Already machine-verified locally (not needing human re-test): server static+API round-trips ×3 apps, `/vapid` key derivation ×2, deny/redirect/cache headers, the full backup+archival cycle through the file KV, and `migrate.mjs`'s fetch→snapshot→PUT→byte-verify path._
+_Updated 2026-08-08. Machine-verified (not needing human re-test): server static+API round-trips ×3 apps, `/vapid` derivation ×2, deny/redirect/cache headers, the full backup+archival cycle through the file KV, `migrate.mjs`'s fetch→snapshot→PUT→byte-verify path, and the live domain end-to-end (public DNS, split-horizon, TLS, merged app served). Item #3 (firewall probes) confirmed 2026-08-08 and graduated; numbering keeps its gap._
 
 ## 1. Rehearsal room end-to-end on baby.defc0n.no — BLOCKS CUTOVER
 **Steps:** `server/DEPLOY.md` §1f — on two devices, open `https://baby.defc0n.no/baby-tracker/`, sign in with the family password + slug `rehearse` (isolated empty room). Log a feed on device A. Enable 🔔 notifications on both, send Test. Set the feed alert to 1 min / crit `low`, close the app, wait.
@@ -13,10 +13,6 @@ _Updated 2026-08-08 (selfhost branch). Already machine-verified locally (not nee
 ## 2. Offline-first on the new origin
 **Steps:** with the rehearsal room installed as PWA, airplane-mode the phone, reopen the app, log an entry, restore network.
 **Pass:** app opens from the SW cache while offline; the entry exists locally; it reaches the other device within one poll (≈3 s) of reconnecting.
-
-## 3. Firewall rule for the app port (verification discipline: real connections, both directions)
-**Steps:** the private run-book §1c probes — positive from the reverse-proxy host, negative from another guest.
-**Pass:** the proxy host gets `{"ok":true...}`; the other guest gets refused/timeout; the firewall config compiles clean.
 
 ## 4. Home Assistant against the new origin (after cutover §2.6)
 **Steps:** trigger the HA log path (voice or service call: log a diaper), then wait one summary scan interval.
