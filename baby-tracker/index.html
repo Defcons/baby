@@ -326,6 +326,12 @@
   .tldot.pump { background: #5f8fbf; }
   .tldot.health { background: #bf7d5f; }
   .tldot.bath { background: #6aa7c8; }
+  /* multi-day (3d/7d) rows: one day per row, clock-aligned for pattern reading */
+  .tldaylab { font-size: 9px; color: var(--subtle); width: 30px; flex: none; text-transform: uppercase; letter-spacing: 0.02em; }
+  .tltrack.tall { height: 16px; }
+  .tlbar.inset { top: 4px; bottom: 4px; }
+  .tlnowline { position: absolute; top: -1px; bottom: -1px; width: 2px; background: var(--go-text); border-radius: 1px; }
+  .tlaxis.days { margin-left: 38px; }
 
   /* daily history table */
   .hist { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 6px 12px; font-size: 13px; }
@@ -506,6 +512,8 @@
       <button data-h="6">6h</button>
       <button data-h="12">12h</button>
       <button data-h="24">24h</button>
+      <button data-h="72">3d</button>
+      <button data-h="168">7d</button>
     </div>
   </div>
   <div class="tl" id="timeline"></div>
@@ -1386,11 +1394,11 @@
   // ---- activity timeline: one lane per type; bars for durations, dots/icons for
   // events; span (6/12/24h) is a per-device preference ----
   const TL_SPAN_KEY = 'btTlSpan';
-  let tlSpan = (function(){ try { const v = +localStorage.getItem(TL_SPAN_KEY); return [6, 12, 24].includes(v) ? v : 24; } catch(e) { return 24; } })();
+  let tlSpan = (function(){ try { const v = +localStorage.getItem(TL_SPAN_KEY); return [6, 12, 24, 72, 168].includes(v) ? v : 24; } catch(e) { return 24; } })();
   const tlSpansEl = document.getElementById('tlSpans');
   function paintTlSpan() {
     tlSpansEl.querySelectorAll('button').forEach(b => b.classList.toggle('sel', +b.dataset.h === tlSpan));
-    document.getElementById('tlTitle').textContent = `Last ${tlSpan} hours`;
+    document.getElementById('tlTitle').textContent = tlSpan > 24 ? `Last ${tlSpan / 24} days` : `Last ${tlSpan} hours`;
   }
   tlSpansEl.addEventListener('click', (e) => {
     const b = e.target.closest('button');
@@ -1426,7 +1434,49 @@
     return ticks;
   }
 
+  // ---- multi-day view (3d/7d): one row per day, hours aligned vertically so
+  // same-time-of-day patterns (evening cluster feeds, night wakings) stack up
+  // for comparison. Sleep = full bars, nurse = inset bars, bottle = dots;
+  // live timers included; newest day on top. No scrubber in this mode. ----
+  function renderTimelineDays() {
+    const days = tlSpan / 24;
+    const now = Date.now();
+    const DAY = 86400000;
+    const d0 = new Date(); d0.setHours(0, 0, 0, 0);
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const tickHtml = [25, 50, 75].map(p => `<span class="tltick" style="left:${p}%"></span>`).join('');
+    const durs = [];
+    for (const e of entries) if ((e.type === 'sleep' || e.type === 'nurse') && e.end) durs.push(e);
+    for (const k of ['sleep', 'nurse']) if (active[k]) durs.push({ type: k, start: active[k].start, end: now, live: true });
+    const dots = entries.filter((e) => e.type === 'bottle');
+    let html = '<div class="tlbody">';
+    for (let i = 0; i < days; i++) {
+      const start = d0.getTime() - i * DAY, end = start + DAY;
+      const pct = (t) => Math.max(0, Math.min(100, (t - start) / DAY * 100));
+      let evs = '';
+      for (const e of durs) {
+        if (e.end <= start || e.start >= end) continue;
+        const l = pct(e.start), r = pct(e.end);
+        evs += `<span class="tlbar ${e.type}${e.type === 'nurse' ? ' inset' : ''}${e.live ? ' live' : ''}" style="left:${l}%;width:${Math.max(r - l, 0.5)}%"></span>`;
+      }
+      for (const e of dots) {
+        if (e.start < start || e.start >= end) continue;
+        evs += `<span class="tldot bottle" style="left:${pct(e.start)}%"></span>`;
+      }
+      if (i === 0) evs += `<span class="tlnowline" style="left:${pct(now)}%"></span>`;
+      const dt = new Date(start);
+      const label = i === 0 ? 'today' : days <= 3 ? (i === 1 ? 'yday' : dayNames[dt.getDay()]) : dayNames[dt.getDay()] + ' ' + dt.getDate();
+      html += `<div class="tlrow"><span class="tldaylab">${label}</span><div class="tltrack tall">${tickHtml}${evs}</div></div>`;
+    }
+    html += '</div>';
+    html += '<div class="tlaxis days">' + [0, 6, 12, 18].map((h) =>
+      `<span${h === 0 ? ' class="edgeL"' : ''} style="left:${h / 24 * 100}%">${String(h).padStart(2, '0')}:00</span>`
+    ).join('') + '<span class="tlnow">24:00</span></div>';
+    document.getElementById('timeline').innerHTML = html;
+  }
+
   function renderTimeline() {
+    if (tlSpan > 24) return renderTimelineDays();
     const now = Date.now();
     const spanMs = tlSpan * 3600000;
     const from = now - spanMs;
@@ -1496,6 +1546,7 @@
     paintTlCursor();
   }
   timelineEl.addEventListener('pointerdown', (e) => {
+    if (tlSpan > 24) return; // day-rows mode has no scrubber
     if (e.target.closest('.tlbubble')) { tlCursor = null; paintTlCursor(); return; }
     if (!e.target.closest('.tlbody')) return;
     tlDragging = true;

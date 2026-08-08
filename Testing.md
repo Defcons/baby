@@ -17,3 +17,7 @@ _Updated 2026-08-08 (post-cutover). Graduated as CONFIRMED: #3 firewall probes, 
 ## 6. Push survives a quiet week (background, low priority)
 **Steps:** none — after cutover, just note which device goes longest without opening the app.
 **Pass:** a device that hasn't opened the app for >1 week still receives an alert push (proves `ensurePush` re-registration + endpoint stability against the new VAPID keys).
+
+## 7. Multi-day timeline (3d/7d) on the phones
+**Steps:** baby tracker → timeline card → tap `3d`, then `7d`; find an evening cluster-feeding stretch and compare it across days; toggle back to `24h`.
+**Pass:** one row per day with hours aligned (evening feeds stack visually), today carries the now-marker, bars/dots match the log, and the 24h view + drag scrubber behave exactly as before. (DOM-verified locally with seeded data, 2026-08-08 — phone look-and-feel is what's pending.)
