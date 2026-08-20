@@ -7,7 +7,7 @@
      work. Anchor to SYMBOLS, never line numbers; sagas → ResearchJournal; behaviour truths →
      KnowledgeBase. The stamp is ONE line. -->
 
-_Last verified: 2026-08-08 — merged the remote feature docs (growth chart, bath, grams, paging, age chip, baby.sex) into the baby section + Self-host server section + origin-aware notes; topology scrubbed per the privacy rule._
+_Last verified: 2026-08-20 @ 14dc005 — bible verification pass: a ~30-symbol sample across all three apps + the server checked against code (incl. the 3d/7d days-view landed this session), all accurate; no drift found._
 
 ## Contraction timer
 

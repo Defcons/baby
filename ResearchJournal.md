@@ -8,7 +8,7 @@
   KnowledgeBase.md; cross-link, don't copy; bump the stamp.
 -->
 
-_Last verified: 2026-08-08 (selfhost branch) — appended the self-hosting migration entry (in flight). by Claude Opus 4.8_
+_Last verified: 2026-08-20 @ 14dc005 — appended the 2026-08-20 bible verification pass entry (no drift found)._
 
 _Repo bible: [`OrientationMap.md`](OrientationMap.md) + [`NavigationMap.md`](NavigationMap.md) = where the code lives · [`KnowledgeBase.md`](KnowledgeBase.md) = what's true now · this file = how it got here._
 
@@ -97,6 +97,10 @@ Lessons, both promoted to practice: (1) **fetch and compare against origin befor
 David ran the real migration at 14:31 (ahead of script — the rehearsal folded into device setup). Verification was programmatic, not eyeballed: old-vs-new state diff **identical** (510 entries, matching id sets in both directions, same revision, same live sleep timer), pelvic 1/1, cron warmed, `/summary` live on the new origin, HA repointed (David-confirmed), phones switched the same evening. The freeze rule held — zero entries logged old-side after the copy. The old Pages/Workers stack stays untouched as the fallback through a 1–2 week watch (retirement checklist in ToDo).
 
 Post-cutover model: same worker logic and entry-merge sync, served by the home container; 3 s polls (origin-aware constant); pushes sent by the container's internal cron through the browsers' push services. Remaining human proofs live in Testing (first real closed-app alert, offline round-trip, push after a quiet week).
+
+## 2026-08-20 — Bible verification pass (no drift found)
+
+Scheduled maintenance pass, 12 days into the post-cutover watch period (not yet due — ~2026-08-22). Re-verified all six docs against the two feature commits made since the last pass (`b47d061`/`14dc005`, multi-day timeline + days-view type chips) — both had already self-updated NavigationMap/Testing correctly. Checked every file path, a ~30-symbol sample spanning all three apps + the server, and the quota constants (`POLL_MS`×3, `HOT_DAYS`, `NURSE_TIMER_MS`/`SLEEP_TIMER_MS`) against code: all exact, zero stale pointers found. Confirmed no `docs/` dir exists yet (root stays the doc home) and no share-link/token leaked into any doc. Only change this pass: the six stamps.
 
 ## Open questions / backlog
 - Confirm the OrientationMap KV budget against **metered** Cloudflare analytics (the budget is currently a computed estimate; the incident is the only ground-truth data point).

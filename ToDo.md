@@ -5,7 +5,7 @@
      nothing lives only in chat. Prune the Done section on next touch. Privacy rule applies
      here too: infra topology stays in the PRIVATE homelab run-book; items point, not copy. -->
 
-_Updated 2026-08-08 (late evening) — CUTOVER DONE; watch period runs to ~2026-08-22 (ResearchJournal 2026-08-08 evening)._
+_Updated 2026-08-20 @ 14dc005 — bible verification pass: all open items re-confirmed still open, nothing pruned; watch period runs to ~2026-08-22 (ResearchJournal 2026-08-08 evening)._
 
 ## Open
 

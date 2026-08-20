@@ -4,7 +4,7 @@
      item = repro steps + pass criteria, runnable cold. Once CONFIRMED, graduate the fact
      (KnowledgeBase / the maps) and DELETE the item — this file holds only the unconfirmed. -->
 
-_Updated 2026-08-08 (post-cutover). Graduated as CONFIRMED: #3 firewall probes, #4 HA against the new origin (repointed + confirmed by David), #5 migration data integrity (identical 510/510 id diff verified programmatically + phones checked). Machine-verified earlier: server round-trips, `/vapid`, headers/guards, backup+archival cycle, migrate byte-verify, domain end-to-end. Numbering keeps its gaps._
+_Updated 2026-08-20 @ 14dc005 (bible verification pass — all items re-confirmed still pending, repro steps still accurate against shipped code; nothing graduated this pass). Graduated as CONFIRMED: #3 firewall probes, #4 HA against the new origin (repointed + confirmed by David), #5 migration data integrity (identical 510/510 id diff verified programmatically + phones checked). Machine-verified earlier: server round-trips, `/vapid`, headers/guards, backup+archival cycle, migrate byte-verify, domain end-to-end. Numbering keeps its gaps._
 
 ## 1. First real closed-app alert (post-cutover — proves the server cron end-to-end)
 **Steps:** on a phone with 🔔 enabled, switch on a real alert rule (any tier), close the app fully, let the condition cross naturally (or set the threshold low once).

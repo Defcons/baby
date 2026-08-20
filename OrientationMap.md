@@ -7,7 +7,7 @@
      bites from UNRELATED work). Anchor to SYMBOLS, never line numbers. Target ≤ ~20 KB.
      The stamp below is ONE line, not a changelog. -->
 
-_Last verified: 2026-08-08 — noted the in-flight self-host migration (detail → NavigationMap; run-book private). KV budget + landmines still describe the live Pages/Workers stack until cutover._
+_Last verified: 2026-08-20 @ 14dc005 — bible verification pass: file paths and the subsystem index re-checked against code, no drift found. KV budget + landmines still describe the live Pages/Workers stack until cutover._
 
 ## What this is
 A family of small baby apps, one folder per app — historically a static page on GitHub Pages + a Cloudflare Worker per app for cross-device sync; NOW MID-MIGRATION to one self-hosted server (`server/` — NavigationMap §Self-host server, RJ 2026-08-08; deployment topology lives in the PRIVATE homelab run-book). Both stacks run in parallel until cutover; the pages are origin-aware.

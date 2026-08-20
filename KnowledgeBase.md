@@ -9,7 +9,7 @@
   the journal in the verifying commit; bump the stamp.
 -->
 
-_Last verified: 2026-08-08 — feature-merge reconciliation: baby config (name/born/sex, `babyRev` LWW) added to the merge model; earlier passes as previously stamped. by Claude Opus 4.8_
+_Last verified: 2026-08-20 @ 14dc005 — bible verification pass: quota constants (`POLL_MS`×3, `HOT_DAYS`, `NURSE_TIMER_MS`/`SLEEP_TIMER_MS`) re-checked exact against code; no claims changed._
 
 _Repo bible: [`OrientationMap.md`](OrientationMap.md) + [`NavigationMap.md`](NavigationMap.md) = where the code lives + gotchas · this file = how the apps behave · [`ResearchJournal.md`](ResearchJournal.md) = how it got here._
 
