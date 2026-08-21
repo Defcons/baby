@@ -12,4 +12,4 @@ services:
     ports:
       - "10700:8080" # host:container — fronted by the reverse proxy (see the private homelab run-book)
     volumes:
-      - /apps/baby-data:/data # state lives OUTSIDE the git clone; owned by uid 1000 (node)
+      - /opt/baby-data:/data # state lives OUTSIDE the git clone; owned by uid 1000 (node)
