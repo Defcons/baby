@@ -102,6 +102,10 @@ Post-cutover model: same worker logic and entry-merge sync, served by the home c
 
 Scheduled maintenance pass, 12 days into the post-cutover watch period (not yet due — ~2026-08-22). Re-verified all six docs against the two feature commits made since the last pass (`b47d061`/`14dc005`, multi-day timeline + days-view type chips) — both had already self-updated NavigationMap/Testing correctly. Checked every file path, a ~30-symbol sample spanning all three apps + the server, and the quota constants (`POLL_MS`×3, `HOT_DAYS`, `NURSE_TIMER_MS`/`SLEEP_TIMER_MS`) against code: all exact, zero stale pointers found. Confirmed no `docs/` dir exists yet (root stays the doc home) and no share-link/token leaked into any doc. Only change this pass: the six stamps.
 
+## 2026-09-28 — Deploys are never cancelled mid-run
+
+`deploy.yml`: `cancel-in-progress: false`, so a newer push waits its turn instead of cancelling a running deploy, and the deploy job has a 45-min limit with a 40-min `command_timeout` (the SSH action's default was 10 min). A deploy cut off between stopping the old container and starting the new one leaves the app down, and a slow build on the box can take ~20 min.
+
 ## Open questions / backlog
 - Confirm the OrientationMap KV budget against **metered** Cloudflare analytics (the budget is currently a computed estimate; the incident is the only ground-truth data point).
 - Tombstone TTL (60 days, baby deletes) vs a device offline > 60 days — untested resurrection edge case (KB §9).
