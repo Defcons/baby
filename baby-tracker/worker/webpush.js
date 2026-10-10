@@ -68,12 +68,25 @@ export async function vapidHeaders(endpoint, jwk, subject) {
   return { Authorization: `vapid t=${jwt}, k=${b64url(pubRaw)}` };
 }
 
+// Endpoints come from the browser's PushManager, so only the browser push
+// services are accepted (Chrome/Android, Firefox, Safari, Edge).
+const PUSH_HOSTS = ['fcm.googleapis.com', 'android.googleapis.com', 'web.push.apple.com'];
+const PUSH_SUFFIXES = ['.push.services.mozilla.com', '.notify.windows.com'];
+export function isPushEndpoint(endpoint) {
+  let u;
+  try { u = new URL(endpoint); } catch { return false; }
+  if (u.protocol !== 'https:' || u.username || u.password || u.port) return false;
+  return PUSH_HOSTS.includes(u.hostname) || PUSH_SUFFIXES.some((s) => u.hostname.endsWith(s));
+}
+
 // Send one push. Returns the push service's HTTP status.
 export async function sendPush(sub, payloadObj, jwk, subject, { ttl = 3600, urgency = 'high' } = {}) {
+  if (!isPushEndpoint(sub.endpoint)) throw new Error('not a push service endpoint');
   const body = await encryptPayload(JSON.stringify(payloadObj), sub.keys.p256dh, sub.keys.auth);
   const auth = await vapidHeaders(sub.endpoint, jwk, subject);
   const res = await fetch(sub.endpoint, {
     method: 'POST',
+    redirect: 'manual',
     headers: {
       ...auth,
       'Content-Encoding': 'aes128gcm',

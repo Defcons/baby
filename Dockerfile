@@ -1,5 +1,5 @@
 # Self-hosted baby suite: static pages + worker APIs in one small Node process.
-# Data lives in the /data volume (host: /apps/baby-data), never in the image.
+# Data lives in the /data volume (host path in docker-compose.yml), never in the image.
 FROM node:22-alpine
 WORKDIR /app
 COPY . .

@@ -24,7 +24,7 @@
 // (uploaded by the client); a sub without one falls back to the room state's
 // legacy shared `alerts` so old clients keep working.
 
-import { sendPush } from './webpush.js';
+import { sendPush, isPushEndpoint } from './webpush.js';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -35,6 +35,9 @@ const SUBJECT = 'mailto:davidsen908@gmail.com';
 // Re-alert cadence per rule criticality while a condition keeps holding.
 // null = fire once per crossing, no repeats. 'alarm' repeats on every cron run.
 const REPEAT_MS = { low: null, normal: 30 * 60000, high: 10 * 60000, alarm: 4.5 * 60000 };
+// Household-scale limits, so the stored data cannot grow without bound.
+const MAX_ROOMS = 20;
+const MAX_DEVICES = 20; // push subscriptions per room
 
 const json = (obj, status = 200) =>
   new Response(JSON.stringify(obj), { status, headers: { ...CORS, 'Content-Type': 'application/json' } });
@@ -76,8 +79,10 @@ async function getSubs(env, room) {
     const v = await env.STATE.get(k.name);
     if (v) { try { map[k.name.split(':')[2]] = JSON.parse(v); } catch {} }
   }
-  await env.STATE.put('subs:' + room, JSON.stringify(map));
-  for (const k of legacy.keys) await env.STATE.delete(k.name);
+  if (legacy.keys.length) {
+    await env.STATE.put('subs:' + room, JSON.stringify(map));
+    for (const k of legacy.keys) await env.STATE.delete(k.name);
+  }
   return map;
 }
 const putSubs = (env, room, map) => env.STATE.put('subs:' + room, JSON.stringify(map));
@@ -167,45 +172,49 @@ export async function checkAlerts(env) { // exported for tests
   const now = Date.now();
   const jwk = JSON.parse(env.VAPID_JWK);
   for (const room of await getRooms(env)) {
-    const subsMap = await getSubs(env, room);
-    if (!Object.keys(subsMap).length) continue;
-    const raw = await env.STATE.get('room:' + room);
-    if (!raw) continue;
-    let state;
-    try { state = JSON.parse(raw); } catch { continue; }
-    // evaluate each device's own rules (fallback: the legacy shared config)
-    const devices = [];
-    for (const [id, sub] of Object.entries(subsMap)) {
-      const cfg = sub.alerts || state.alerts || {};
-      devices.push({ id, sub, cfg, due: dueAlerts({ ...state, alerts: cfg }, now) });
-    }
-    const alertedKey = 'alerted:' + room;
-    let alerted = {};
-    try { alerted = JSON.parse((await env.STATE.get(alertedKey)) || '{}'); } catch {}
-    let changed = false;
-    const dueKeys = new Set(); // "<deviceId>:<rule>" entries currently due
-    for (const dev of devices) for (const d of dev.due) dueKeys.add(`${dev.id}:${d.key}`);
-    for (const k of Object.keys(alerted)) {
-      if (!dueKeys.has(k)) { delete alerted[k]; changed = true; } // condition reset -> next crossing alerts immediately
-    }
-    let subsChanged = false;
-    for (const dev of devices) {
-      if (inQuietHours(dev.cfg, new Date(now))) continue; // per-device quiet hours
-      for (const d of dev.due) {
-        const ak = `${dev.id}:${d.key}`;
-        const repeat = REPEAT_MS[d.crit] ?? REPEAT_MS.normal;
-        if (alerted[ak] && (repeat === null || now - alerted[ak] < repeat)) continue;
-        let status;
-        try {
-          status = await sendPush(dev.sub, { title: 'Baby Tracker', body: d.body, tag: 'bt-' + d.key, crit: d.crit }, jwk, SUBJECT, { urgency: d.crit === 'low' ? 'normal' : 'high' });
-        } catch { status = 0; }
-        if (status === 404 || status === 410) { delete subsMap[dev.id]; subsChanged = true; }
-        alerted[ak] = now;
-        changed = true;
+    try { // one unreadable room must not stop the others
+      const subsMap = await getSubs(env, room);
+      if (!Object.keys(subsMap).length) continue;
+      const raw = await env.STATE.get('room:' + room);
+      if (!raw) continue;
+      let state;
+      try { state = JSON.parse(raw); } catch { continue; }
+      // evaluate each device's own rules (fallback: the legacy shared config)
+      const devices = [];
+      for (const [id, sub] of Object.entries(subsMap)) {
+        const cfg = sub.alerts || state.alerts || {};
+        devices.push({ id, sub, cfg, due: dueAlerts({ ...state, alerts: cfg }, now) });
       }
+      const alertedKey = 'alerted:' + room;
+      let alerted = {};
+      try { alerted = JSON.parse((await env.STATE.get(alertedKey)) || '{}'); } catch {}
+      let changed = false;
+      const dueKeys = new Set(); // "<deviceId>:<rule>" entries currently due
+      for (const dev of devices) for (const d of dev.due) dueKeys.add(`${dev.id}:${d.key}`);
+      for (const k of Object.keys(alerted)) {
+        if (!dueKeys.has(k)) { delete alerted[k]; changed = true; } // condition reset -> next crossing alerts immediately
+      }
+      let subsChanged = false;
+      for (const dev of devices) {
+        if (inQuietHours(dev.cfg, new Date(now))) continue; // per-device quiet hours
+        for (const d of dev.due) {
+          const ak = `${dev.id}:${d.key}`;
+          const repeat = REPEAT_MS[d.crit] ?? REPEAT_MS.normal;
+          if (alerted[ak] && (repeat === null || now - alerted[ak] < repeat)) continue;
+          let status;
+          try {
+            status = await sendPush(dev.sub, { title: 'Baby Tracker', body: d.body, tag: 'bt-' + d.key, crit: d.crit }, jwk, SUBJECT, { urgency: d.crit === 'low' ? 'normal' : 'high' });
+          } catch { status = 0; }
+          if (status === 404 || status === 410) { delete subsMap[dev.id]; subsChanged = true; }
+          alerted[ak] = now;
+          changed = true;
+        }
+      }
+      if (subsChanged) await putSubs(env, room, subsMap);
+      if (changed) await env.STATE.put(alertedKey, JSON.stringify(alerted));
+    } catch (e) {
+      console.error('[checkAlerts] skipped room', String(room).slice(0, 6), e && e.message);
     }
-    if (subsChanged) await putSubs(env, room, subsMap);
-    if (changed) await env.STATE.put(alertedKey, JSON.stringify(alerted));
   }
   // heartbeat for the in-app status line; throttled to respect the KV write quota
   try {
@@ -230,34 +239,38 @@ async function dailyMaintenance(env) {
   const backupCut = new Date(now - BACKUP_KEEP_DAYS * 86400000).toISOString().slice(0, 10);
   const rooms = (await env.STATE.list({ prefix: 'room:' })).keys.map((k) => k.name.slice(5));
   for (const room of rooms) {
-    const raw = await env.STATE.get('room:' + room);
-    if (!raw) continue;
-    await env.STATE.put(`backup:${room}:${today}`, raw);
-    const backups = await env.STATE.list({ prefix: `backup:${room}:` });
-    for (const k of backups.keys) {
-      if (k.name.split(':')[2] < backupCut) await env.STATE.delete(k.name);
+    try { // one unreadable room must not stop the others
+      const raw = await env.STATE.get('room:' + room);
+      if (!raw) continue;
+      await env.STATE.put(`backup:${room}:${today}`, raw);
+      const backups = await env.STATE.list({ prefix: `backup:${room}:` });
+      for (const k of backups.keys) {
+        if (k.name.split(':')[2] < backupCut) await env.STATE.delete(k.name);
+      }
+      let s;
+      try { s = JSON.parse(raw); } catch { continue; }
+      const entries = s.entries || [];
+      const old = entries.filter((e) => e.start < cut);
+      if (!old.length) continue;
+      const byMonth = {};
+      for (const e of old) (byMonth[new Date(e.start).toISOString().slice(0, 7)] ||= []).push(e);
+      for (const [mon, list] of Object.entries(byMonth)) {
+        const akey = `archive:${room}:${mon}`;
+        let arch = [];
+        try { arch = JSON.parse((await env.STATE.get(akey)) || '[]'); } catch {}
+        const ids = new Set(arch.map((e) => e.id));
+        for (const e of list) if (!ids.has(e.id)) arch.push(e);
+        arch.sort((x, y) => x.start - y.start);
+        await env.STATE.put(akey, JSON.stringify(arch));
+      }
+      s.entries = entries.filter((e) => e.start >= cut);
+      s.archivedBefore = Math.max(s.archivedBefore || 0, cut);
+      if (s.deleted) for (const id of Object.keys(s.deleted)) if (s.deleted[id] < cut) delete s.deleted[id];
+      s.revision = now;
+      await env.STATE.put('room:' + room, JSON.stringify(s));
+    } catch (e) {
+      console.error('[dailyMaintenance] skipped room', room.slice(0, 6), e && e.message);
     }
-    let s;
-    try { s = JSON.parse(raw); } catch { continue; }
-    const entries = s.entries || [];
-    const old = entries.filter((e) => e.start < cut);
-    if (!old.length) continue;
-    const byMonth = {};
-    for (const e of old) (byMonth[new Date(e.start).toISOString().slice(0, 7)] ||= []).push(e);
-    for (const [mon, list] of Object.entries(byMonth)) {
-      const akey = `archive:${room}:${mon}`;
-      let arch = [];
-      try { arch = JSON.parse((await env.STATE.get(akey)) || '[]'); } catch {}
-      const ids = new Set(arch.map((e) => e.id));
-      for (const e of list) if (!ids.has(e.id)) arch.push(e);
-      arch.sort((x, y) => x.start - y.start);
-      await env.STATE.put(akey, JSON.stringify(arch));
-    }
-    s.entries = entries.filter((e) => e.start >= cut);
-    s.archivedBefore = Math.max(s.archivedBefore || 0, cut);
-    if (s.deleted) for (const id of Object.keys(s.deleted)) if (s.deleted[id] < cut) delete s.deleted[id];
-    s.revision = now;
-    await env.STATE.put('room:' + room, JSON.stringify(s));
   }
 }
 
@@ -303,6 +316,8 @@ export default {
       } catch {
         return new Response('bad json', { status: 400, headers: CORS });
       }
+      if ((await env.STATE.get(key)) === null && (await env.STATE.list({ prefix: 'room:' })).keys.length >= MAX_ROOMS)
+        return new Response('room limit reached', { status: 403, headers: CORS });
       await env.STATE.put(key, text);
       return new Response('ok', { headers: CORS });
     }
@@ -311,7 +326,7 @@ export default {
       let sub;
       try {
         sub = JSON.parse(await req.text());
-        if (!/^https:\/\//.test(sub.endpoint) || sub.endpoint.length > 1024) throw 0;
+        if (!isPushEndpoint(sub.endpoint) || sub.endpoint.length > 1024) throw 0;
         if (typeof sub.keys?.p256dh !== 'string' || typeof sub.keys?.auth !== 'string') throw 0;
       } catch {
         return new Response('bad subscription', { status: 400, headers: CORS });
@@ -320,7 +335,9 @@ export default {
       const rec = { endpoint: sub.endpoint, keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth } };
       // per-device alert prefs ride along with the subscription
       if (sub.alerts && typeof sub.alerts === 'object' && JSON.stringify(sub.alerts).length <= 4096) rec.alerts = sub.alerts;
+      if ((await env.STATE.get(key)) === null) return new Response('unknown room', { status: 404, headers: CORS });
       const subs = await getSubs(env, room);
+      if (!subs[id] && Object.keys(subs).length >= MAX_DEVICES) return new Response('device limit reached', { status: 403, headers: CORS });
       // clients re-POST on every load — skip the write when nothing changed
       if (JSON.stringify(subs[id]) !== JSON.stringify(rec)) { subs[id] = rec; await putSubs(env, room, subs); }
       await addRoomToIndex(env, room);

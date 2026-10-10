@@ -5,6 +5,7 @@ data
 node_modules
 homeassistant
 docs
+tests
 *.md
 .env
 .gitignore

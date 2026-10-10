@@ -7,6 +7,8 @@ const CORS = {
   'Access-Control-Allow-Methods': 'GET,PUT,OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type',
 };
+// Household-scale limit, so the stored data cannot grow without bound.
+const MAX_ROOMS = 20;
 
 export default {
   async fetch(req, env) {
@@ -33,6 +35,8 @@ export default {
       } catch {
         return new Response('bad json', { status: 400, headers: CORS });
       }
+      if ((await env.STATE.get(key)) === null && (await env.STATE.list({ prefix: 'room:' })).keys.length >= MAX_ROOMS)
+        return new Response('room limit reached', { status: 403, headers: CORS });
       await env.STATE.put(key, text);
       return new Response('ok', { headers: CORS });
     }

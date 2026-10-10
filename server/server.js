@@ -55,7 +55,7 @@ const MIME = {
   '.woff2': 'font/woff2',
 };
 // Top-level dirs (and the per-app worker/ dirs) that are code/ops, not site.
-const DENY = new Set(['server', 'worker', 'homeassistant', 'docs', 'backups', 'data', 'node_modules', 'package.json']);
+const DENY = new Set(['server', 'worker', 'homeassistant', 'docs', 'tests', 'backups', 'data', 'node_modules', 'package.json']);
 
 function send(res, status, body, type = 'text/plain; charset=utf-8') {
   res.writeHead(status, { 'Content-Type': type, 'Cache-Control': 'no-cache', 'X-Content-Type-Options': 'nosniff' });

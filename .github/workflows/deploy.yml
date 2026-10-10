@@ -1,13 +1,19 @@
 name: Deploy to home server
 
 # CI joins the tailnet and deploys over SSH. The server-side key is
-# command-restricted, so the script below is effectively documentation —
-# the host runs its own pinned deploy script regardless.
+# command-restricted, so the host runs its own pinned deploy script whatever
+# command is sent.
+#
+# Third-party actions are pinned to a commit SHA (the comment is the tag it
+# resolved to). To bump one: git ls-remote https://github.com/<repo> <tag>.
 
 on:
   push:
     branches: [main]
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 # Never cancel a running deploy: one killed after compose removed the old container leaves the app down. A newer push waits its turn.
 concurrency:
@@ -15,32 +21,64 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22 # same major as the Dockerfile
+      - run: npm test
+
   deploy:
+    needs: test
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
       - name: Connect to Tailscale
-        uses: tailscale/github-action@v3
+        uses: tailscale/github-action@6cae46e2d796f265265cfcf628b72a32b4d7cade # v3.3.0
         with:
           oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
           oauth-secret:    ${{ secrets.TS_OAUTH_SECRET }}
           tags:            tag:ci
-          version:         latest
+          # The client is pinned too. To bump: a stable version and its
+          # tailscale_<ver>_amd64.tgz.sha256 from https://pkgs.tailscale.com/stable/
+          version:         1.102.4
+          sha256sum:       50748df1045e60b5b695f19f4c56b0da36c019948b440fb456b6584a50f0d8b9
 
-      - name: Deploy via SSH over Tailscale
-        uses: appleboy/ssh-action@v1
-        with:
-          host:     ${{ secrets.DEPLOY_HOST }}
-          port:     ${{ secrets.DEPLOY_PORT }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key:      ${{ secrets.DEPLOY_SSH_KEY }}
-          # Generous (the action's default is 10m): a slow build on the box can take ~20 min, and a deploy cut off mid-swap leaves the app down.
-          command_timeout: 40m
-          script: |
-            set -euo pipefail
-            cd /apps/baby
-            git fetch origin
-            git reset --hard origin/main
-            docker compose build
-            docker compose up -d
-            echo "baby deploy complete ($(git rev-parse --short HEAD))"
+      - name: Wait for subnet routes
+        run: sleep 10
+
+      # Plain OpenSSH, so no third-party SSH binary gets the key. The step fails
+      # when the host's deploy script fails. Generous timeout: a slow build on
+      # the box can take ~20 min, and a deploy cut off mid-swap leaves the app down.
+      # DEPLOY_KNOWN_HOSTS (optional) pins the host key; unset trusts it on first use.
+      - name: Deploy over Tailscale
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          if [ -n "$DEPLOY_KNOWN_HOSTS" ]; then
+            printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+            hostcheck=yes
+          else
+            hostcheck=accept-new
+          fi
+          timeout 2400 ssh -i ~/.ssh/deploy_key \
+            -o StrictHostKeyChecking="$hostcheck" \
+            -o ConnectTimeout=60 \
+            -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" deploy-baby
+
+      # Over the public path (public DNS), the way the phones reach it.
+      - name: Check the app answers
+        run: curl -fsS --retry 10 --retry-delay 3 --retry-all-errors --doh-url https://cloudflare-dns.com/dns-query https://baby.defc0n.no/healthz

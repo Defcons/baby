@@ -1178,7 +1178,7 @@
     return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
   }
   function esc(s) {
-    return s.replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+    return String(s).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   }
   function timeInputVal(ts) {
     const d = new Date(ts);
@@ -1497,7 +1497,7 @@
     const spanMs = tlSpan * 3600000;
     const from = now - spanMs;
     const pct = (t) => (t - from) / spanMs * 100;
-    const sideTag = (s) => `<span class="tlside">${s === 'both' ? 'B' : (s || '')}</span>`;
+    const sideTag = (s) => `<span class="tlside">${s === 'both' ? 'B' : esc(s || '')}</span>`;
     const ticks = tlTicks(from, now);
     const tickHtml = ticks.map(t => `<span class="tltick" style="left:${pct(t)}%"></span>`).join('');
     let html = '<div class="tlbody">';
@@ -1645,11 +1645,11 @@
     const by = e.by ? ` · ${e.by}` : '';
     const li = document.createElement('li');
     li.innerHTML = `<span class="ico">${entryIcon(e)}</span>
-                    <span class="main"><span class="type">${entryTypeLabel(e)}</span><span class="detail">${esc(entryDetail(e) + by)}</span></span>
+                    <span class="main"><span class="type">${esc(entryTypeLabel(e))}</span><span class="detail">${esc(entryDetail(e) + by)}</span></span>
                     <span class="time">${fmtClock(e.start)}</span>
                     <span class="rowacts">
-                      <button class="rowbtn" data-edit="${e.id}" aria-label="Edit">✎</button>
-                      <button class="rowbtn" data-del="${e.id}" aria-label="Delete">✕</button>
+                      <button class="rowbtn" data-edit="${esc(e.id)}" aria-label="Edit">✎</button>
+                      <button class="rowbtn" data-del="${esc(e.id)}" aria-label="Delete">✕</button>
                     </span>${e.note ? `<span class="note">${esc(e.note)}</span>` : ''}`;
     return li;
   }

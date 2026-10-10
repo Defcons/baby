@@ -12,7 +12,7 @@
 // When a sub carries its room, reminders are skipped once 3 sessions are
 // already logged that local day.
 
-import { sendPush } from './webpush.js';
+import { sendPush, isPushEndpoint } from './webpush.js';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -20,6 +20,9 @@ const CORS = {
   'Access-Control-Allow-Headers': 'Content-Type',
 };
 const SUBJECT = 'mailto:davidsen908@gmail.com';
+// Household-scale limits, so the stored data cannot grow without bound.
+const MAX_ROOMS = 20;
+const MAX_SUBS = 20;
 
 const json = (obj, status = 200) =>
   new Response(JSON.stringify(obj), { status, headers: { ...CORS, 'Content-Type': 'application/json' } });
@@ -140,6 +143,8 @@ export default {
         } catch {
           return new Response('bad json', { status: 400, headers: CORS });
         }
+        if ((await env.STATE.get(key)) === null && (await env.STATE.list({ prefix: 'room:' })).keys.length >= MAX_ROOMS)
+          return new Response('room limit reached', { status: 403, headers: CORS });
         await env.STATE.put(key, text);
         return new Response('ok', { headers: CORS });
       }
@@ -149,7 +154,7 @@ export default {
       let d;
       try {
         d = JSON.parse(await req.text());
-        if (!/^https:\/\//.test(d.endpoint) || d.endpoint.length > 1024) throw 0;
+        if (!isPushEndpoint(d.endpoint) || d.endpoint.length > 1024) throw 0;
         if (typeof d.keys?.p256dh !== 'string' || typeof d.keys?.auth !== 'string') throw 0;
         if (!Array.isArray(d.times) || d.times.length > 6 || !d.times.every((t) => TIME_RE.test(t))) throw 0;
       } catch {
@@ -160,6 +165,7 @@ export default {
       const subs = await getSubs(env);
       const id = await endpointHash(d.endpoint);
       const prev = subs[id];
+      if (!prev && Object.keys(subs).length >= MAX_SUBS) return new Response('device limit reached', { status: 403, headers: CORS });
       if (prev && prev.sent) rec.sent = prev.sent; // keep today's already-sent markers
       // clients re-POST on every load — skip the write when nothing changed
       if (JSON.stringify(prev) !== JSON.stringify(rec)) { subs[id] = rec; await putSubs(env, subs); }

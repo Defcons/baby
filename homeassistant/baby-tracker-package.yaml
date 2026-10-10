@@ -11,8 +11,8 @@
 #          packages: !include_dir_named packages
 #   2. Copy this file to <config>/packages/baby_tracker.yaml
 #   3. Add to <config>/secrets.yaml (room id = credential, never publish it):
-#        baby_tracker_log_url: https://baby-tracker-sync.<account>.workers.dev/log/<ROOM_ID>
-#        baby_tracker_summary_url: https://baby-tracker-sync.<account>.workers.dev/summary/<ROOM_ID>
+#        baby_tracker_log_url: https://<your-host>/api/baby/log/<ROOM_ID>
+#        baby_tracker_summary_url: https://<your-host>/api/baby/summary/<ROOM_ID>
 #   4. Restart Home Assistant.
 #   5. Settings -> Voice assistants -> Expose: expose every script.baby_*
 #      so the voice assistant can log by name.
@@ -362,8 +362,8 @@ script:
             ago_min: "{{ ago_min | default(0) | int }}"
             note: "{{ note | default('') }}"
 
-# ---- read side: one REST sensor polls /summary (keep scan_interval >= 120s —
-# it costs KV read quota), template sensors expose friendly entities so the
+# ---- read side: one REST sensor polls /summary (scan_interval 120s is plenty),
+# template sensors expose friendly entities so the
 # voice assistant can also ANSWER questions ("when did the baby last eat?",
 # "is the baby sleeping?", "how many diapers today?").
 sensor:
