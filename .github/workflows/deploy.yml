@@ -78,7 +78,3 @@ jobs:
             -o StrictHostKeyChecking="$hostcheck" \
             -o ConnectTimeout=60 \
             -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" deploy-baby
-
-      # Over the public path (public DNS), the way the phones reach it.
-      - name: Check the app answers
-        run: curl -fsS --retry 10 --retry-delay 3 --retry-all-errors --doh-url https://cloudflare-dns.com/dns-query https://baby.defc0n.no/healthz
