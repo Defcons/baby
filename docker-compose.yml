@@ -5,11 +5,21 @@ services:
     restart: unless-stopped
     environment:
       - TZ=Europe/Oslo
+      # The port the server listens on. A box that publishes the same number sets BABY_PORT and BABY_PUBLISH in its
+      # .env (a firewall rule for the port then matches); without them, 8080 inside and 10700 outside.
+      - PORT=${BABY_PORT:-8080}
     # BABY_VAPID_JWK + PELVIC_VAPID_JWK — created on the host, never committed
     # (see the private homelab run-book). Deploys `git reset --hard`, so .env
     # being untracked is what keeps it alive.
     env_file: .env
     ports:
-      - "10700:8080" # host:container — fronted by the reverse proxy (see the private homelab run-book)
+      - "${BABY_PUBLISH:-10700}:${BABY_PORT:-8080}" # host:container — fronted by the reverse proxy (see the private homelab run-book)
     volumes:
-      - /opt/baby-data:/data # state lives OUTSIDE the git clone; owned by uid 1000 (node)
+      - ${BABY_DATA:-/opt/baby-data}:/data # state lives OUTSIDE the git clone; owned by uid 1000 (node); BABY_DATA moves it
+    healthcheck:
+      # $$ reaches the container's shell as $, so this asks the port the server listens on.
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:$$PORT/healthz || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
