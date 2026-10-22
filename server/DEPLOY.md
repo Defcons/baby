@@ -8,6 +8,7 @@ topology stays out of public git.
 What is public is visible in the tree anyway: one small container serves the
 static pages plus `/api/{baby,pelvic,contraction}` (the worker code bridged
 unchanged onto a file-backed KV) with an internal 5-minute cron; data lives in
-a host volume owned by uid 1000; `.env` supplies `BABY_VAPID_JWK` +
+a host volume owned by the server's own user (uid 10001, read-only root; the one-shot `baby-init`
+compose service gives it the folder before every start); `.env` supplies `BABY_VAPID_JWK` +
 `PELVIC_VAPID_JWK`; `GET /healthz` for monitoring; pushes to `main` deploy via
 the GitHub Actions workflow.
