@@ -1,8 +1,37 @@
 services:
+  # One step before the server at every start: gives /data to the server's own user (uid 10001), changing only what is not
+  # already its (a restore or a copy made as another user included). Root with the chown right and the right to read
+  # every folder, nothing else, no network; it exits at once.
+  baby-init:
+    build: .
+    image: baby:local
+    user: "0:0"
+    command: ["sh", "-c", "find /data \\( ! -user 10001 -o ! -group 10001 \\) -exec chown -h 10001:10001 {} +"]
+    restart: "no"
+    network_mode: none
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_READ_SEARCH]
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - ${BABY_DATA:-/opt/baby-data}:/data
   baby:
     build: .
+    image: baby:local
     container_name: baby
     restart: unless-stopped
+    depends_on:
+      baby-init:
+        condition: service_completed_successfully
+    # Not root: uid 10001 owns /data (the step above), the code is read-only, and /tmp is the only other writable place.
+    user: "10001:10001"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=16m
     environment:
       - TZ=Europe/Oslo
       # The port the server listens on. A box that publishes the same number sets BABY_PORT and BABY_PUBLISH in its
@@ -15,7 +44,7 @@ services:
     ports:
       - "${BABY_PUBLISH:-10700}:${BABY_PORT:-8080}" # host:container — fronted by the reverse proxy (see the private homelab run-book)
     volumes:
-      - ${BABY_DATA:-/opt/baby-data}:/data # state lives OUTSIDE the git clone; owned by uid 1000 (node); BABY_DATA moves it
+      - ${BABY_DATA:-/opt/baby-data}:/data # state lives OUTSIDE the git clone; the init step gives it to the server's user; BABY_DATA moves it
     healthcheck:
       # $$ reaches the container's shell as $, so this asks the port the server listens on.
       test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:$$PORT/healthz || exit 1"]

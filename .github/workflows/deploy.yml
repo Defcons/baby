@@ -33,8 +33,20 @@ jobs:
           node-version: 22 # same major as the Dockerfile
       - run: npm test
 
+  # The image and docker-compose.yml as the server runs them: its own user, a read-only filesystem, the init step giving
+  # it the data folder. A container that cannot start in that shape stops the deploy here, not on the server.
+  container:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Start the container in its shape
+        run: bash tests/container-smoke.sh
+
   deploy:
-    needs: test
+    needs: [test, container]
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
