@@ -332,18 +332,7 @@
   </div>
 
 <script>
-  // Self-hosted origins use the same-origin API; the GitHub Pages deployment
-  // keeps talking to the legacy Cloudflare Worker until it is retired.
-  const SELF_HOSTED = !/\.github\.io$/i.test(location.hostname);
-  const REMINDER_URL = SELF_HOSTED ? '/api/pelvic' : 'https://pelvic-reminders.davidsen908.workers.dev';
-  // Cutover switch (server/DEPLOY.md): flip to true once the family has moved.
-  const MOVED_BANNER = false;
-  if (MOVED_BANNER && !SELF_HOSTED) {
-    const b = document.createElement('div');
-    b.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#b33226;color:#fff;text-align:center;padding:10px 14px;font-size:14px;';
-    b.innerHTML = 'This app has moved to <a href="https://baby.defc0n.no/pelvic-trainer/" style="color:#fff;font-weight:700;">baby.defc0n.no</a> — this copy no longer syncs.';
-    document.body.appendChild(b);
-  }
+  const REMINDER_URL = '/api/pelvic'; // same-origin API on the self-hosted server
   const LOG_KEY = 'pfLog_v1';       // [{id, ts, hold, rest, reps, quicks, preset}]
   const CFG_KEY = 'pfCfg_v1';       // {preset, hold, rest, reps, quicks}
   const REM_KEY = 'pfRem_v1';       // [{on, t}, ...]

@@ -281,18 +281,7 @@
 <script>
   const STORAGE_KEY = 'contractionLog_v2';
   const ROOM_KEY = 'syncRoom_v1';
-  // Self-hosted origins use the same-origin API; the GitHub Pages deployment
-  // keeps talking to the legacy Cloudflare Worker until it is retired.
-  const SELF_HOSTED = !/\.github\.io$/i.test(location.hostname);
-  const SYNC_URL = SELF_HOSTED ? '/api/contraction' : 'https://contraction-sync.davidsen908.workers.dev';
-  // Cutover switch (server/DEPLOY.md): flip to true once the family has moved.
-  const MOVED_BANNER = false;
-  if (MOVED_BANNER && !SELF_HOSTED) {
-    const b = document.createElement('div');
-    b.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#b33226;color:#fff;text-align:center;padding:10px 14px;font-size:14px;';
-    b.innerHTML = 'This app has moved to <a href="https://baby.defc0n.no/contraction-tracker/" style="color:#fff;font-weight:700;">baby.defc0n.no</a> — this copy no longer syncs.';
-    document.body.appendChild(b);
-  }
+  const SYNC_URL = '/api/contraction'; // same-origin API on the self-hosted server
   const POLL_MS = 4000;
 
   let contractions = [];

@@ -963,23 +963,9 @@
   // sha256 of the shared password; the sync room id is derived from the password itself,
   // so it never appears in this (public) repo
   const PASS_SHA256 = '766724e2275657b656fcc8f94ecacadff3a798689303c5aa4d0e579ced7066b9';
-  // Self-hosted origins use the same-origin API (and afford a snappier poll —
-  // no KV quotas there); the GitHub Pages deployment keeps talking to the
-  // legacy Cloudflare Worker until it is retired.
-  const SELF_HOSTED = !/\.github\.io$/i.test(location.hostname);
-  const SYNC_URL = SELF_HOSTED ? '/api/baby' : 'https://baby-tracker-sync.davidsen908.workers.dev';
-  const POLL_MS = SELF_HOSTED ? 3000 : 10000; // Pages must stay well inside Workers/KV free-tier daily quotas
+  const SYNC_URL = '/api/baby'; // same-origin API on the self-hosted server
+  const POLL_MS = 3000;
   const NAME_KEY = 'btDeviceName_v1'; // per-device "who logs from here"
-  const VAPID_PUBLIC = 'BEhnWFpfkQFW6KpxWhLtJOhj6I8TH4O0Nf9YuS4Ai-cHY0Q5BLB0YYhxyZECd0c6TNQuBhoze8BqXjTuAO3QAWY'; // legacy CF-worker key — github.io only (self-hosted fetches /vapid)
-  // Cutover switch (server/DEPLOY.md): flip to true once the family has moved,
-  // so stale github.io bookmarks/PWA icons can't silently diverge.
-  const MOVED_BANNER = false;
-  if (MOVED_BANNER && !SELF_HOSTED) {
-    const b = document.createElement('div');
-    b.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#b33226;color:#fff;text-align:center;padding:10px 14px;font-size:14px;';
-    b.innerHTML = 'This app has moved to <a href="https://baby.defc0n.no/baby-tracker/" style="color:#fff;font-weight:700;">baby.defc0n.no</a> — this copy no longer syncs.';
-    document.body.appendChild(b);
-  }
   const PUSH_FLAG = 'btPushOn_v1'; // per-device: user enabled notifications here
 
   function defaultAlerts() {
@@ -2697,11 +2683,9 @@
     }
   }
 
-  // Public VAPID key: the self-hosted server serves its key at /vapid (mirrors
-  // the pelvic trainer) so no key is baked in; github.io keeps the legacy
-  // embedded key for the old worker.
+  // Public VAPID key: the server serves its key at /vapid (mirrors the pelvic
+  // trainer) so no key is baked in.
   async function vapidKey() {
-    if (!SELF_HOSTED) return VAPID_PUBLIC;
     try { const c = localStorage.getItem('btVapid_v1'); if (c) return c; } catch(e) {}
     const d = await (await fetch(`${SYNC_URL}/vapid`)).json();
     try { localStorage.setItem('btVapid_v1', d.publicKey); } catch(e) {}

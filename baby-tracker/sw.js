@@ -12,8 +12,7 @@ self.addEventListener('activate', (e) => {
 });
 
 // Network-first for same-origin GETs so deploys land normally; the cache is
-// only an offline fallback. Sync API calls are excluded either way:
-// cross-origin on github.io, same-origin /api/* when self-hosted.
+// only an offline fallback. Sync API calls (/api/*) are never cached.
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET' || url.origin !== location.origin) return;
