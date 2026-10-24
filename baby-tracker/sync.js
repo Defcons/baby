@@ -54,7 +54,7 @@ function mergeState(a, b, now) {
     const ca = a.active[k], cb = b.active[k];
     let c = null;
     if (ca && cb) c = (ca.mt || ca.start) >= (cb.mt || cb.start) ? ca : cb;
-    else c = ca || cb;
+    else c = ca || cb || null;
     if (c) {
       const id = (k === 'sleep' ? 's' : 'n') + c.start;
       if (byId.has(id) || deleted[id] !== undefined) c = null;
