@@ -19,7 +19,7 @@ const CORS = {
   'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type',
 };
-const SUBJECT = 'mailto:davidsen908@gmail.com';
+const SUBJECT = 'https://baby.defc0n.no'; // VAPID contact: the app's own address
 // Household-scale limits, so the stored data cannot grow without bound.
 const MAX_ROOMS = 20;
 const MAX_SUBS = 20;

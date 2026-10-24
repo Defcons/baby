@@ -68,3 +68,26 @@ for (const [name, send] of [['baby', sendPush], ['pelvic', sendPushPelvic]]) {
     assert.equal(calls.length, 0);
   });
 }
+
+// The VAPID JWT's sub is public to every push service: the app's address, not a mailbox.
+const jwtSub = (call) => {
+  const jwt = /t=([^,]+)/.exec(call.init.headers.Authorization)[1];
+  return JSON.parse(Buffer.from(jwt.split('.')[1], 'base64url')).sub;
+};
+
+test('baby and pelvic test pushes carry the app address as the VAPID subject', async (t) => {
+  const { kv, cleanup } = tempKV();
+  t.after(cleanup);
+  const env = { STATE: kv, VAPID_JWK: await vapidJwk() };
+  const keys = await subKeys();
+  await kv.put('room:testroom1', JSON.stringify({ revision: 1, entries: [] }));
+  const sub = (url) => new Request(url, { method: 'POST', body: JSON.stringify({ endpoint: FCM, keys, times: ['09:00'], tz: 'Europe/Oslo' }) });
+  assert.equal((await baby.fetch(sub('http://internal/subscribe/testroom1'), env)).status, 200);
+  assert.equal((await pelvic.fetch(sub('http://internal/subscribe'), env)).status, 200);
+
+  const calls = stubFetch(t);
+  await baby.fetch(new Request('http://internal/test/testroom1', { method: 'POST' }), env);
+  await pelvic.fetch(new Request('http://internal/test', { method: 'POST', body: JSON.stringify({ endpoint: FCM }) }), env);
+  assert.equal(calls.length, 2);
+  for (const c of calls) assert.equal(jwtSub(c), 'https://baby.defc0n.no');
+});

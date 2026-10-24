@@ -31,7 +31,7 @@ const CORS = {
   'Access-Control-Allow-Methods': 'GET,PUT,POST,OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type',
 };
-const SUBJECT = 'mailto:davidsen908@gmail.com';
+const SUBJECT = 'https://baby.defc0n.no'; // VAPID contact: the app's own address
 // Re-alert cadence per rule criticality while a condition keeps holding.
 // null = fire once per crossing, no repeats. 'alarm' repeats on every cron run.
 const REPEAT_MS = { low: null, normal: 30 * 60000, high: 10 * 60000, alarm: 4.5 * 60000 };
