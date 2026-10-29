@@ -20,6 +20,7 @@ import babyWorker from '../baby-tracker/worker/index.js';
 import pelvicWorker from '../pelvic-trainer/worker/index.js';
 import contractionWorker from '../contraction-tracker/worker/index.js';
 import { makeKV } from './kv.js';
+import { pageHeaders } from './csp.js';
 
 const ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const DATA_DIR = process.env.DATA_DIR || join(ROOT, 'data');
@@ -87,6 +88,7 @@ async function serveStatic(pathname, method, res) {
     'Content-Length': data.length,
     'Cache-Control': cache,
     'X-Content-Type-Options': 'nosniff',
+    ...(ext === '.html' ? pageHeaders(data.toString('utf8')) : {}),
   });
   res.end(method === 'HEAD' ? undefined : data);
 }
