@@ -70,7 +70,7 @@ jobs:
       # Plain OpenSSH, so no third-party SSH binary gets the key. The step fails
       # when the host's deploy script fails. Generous timeout: a slow build on
       # the box can take ~20 min, and a deploy cut off mid-swap leaves the app down.
-      # DEPLOY_KNOWN_HOSTS (optional) pins the host key; unset trusts it on first use.
+      # DEPLOY_KNOWN_HOSTS pins the host keys, and the step stops when it is not set.
       # The command sent is the commit this run tested: the box's script deploys
       # that commit (and refuses one that is not on main), never runs what is sent.
       - name: Deploy over Tailscale
@@ -86,13 +86,11 @@ jobs:
           mkdir -p ~/.ssh && chmod 700 ~/.ssh
           printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          if [ -n "$DEPLOY_KNOWN_HOSTS" ]; then
-            printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
-            hostcheck=yes
-          else
-            hostcheck=accept-new
-          fi
+          if [ -z "$DEPLOY_KNOWN_HOSTS" ]; then echo "::error::DEPLOY_KNOWN_HOSTS is not set"; exit 1; fi
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
           timeout 2400 ssh -i ~/.ssh/deploy_key \
-            -o StrictHostKeyChecking="$hostcheck" \
+            -o StrictHostKeyChecking=yes \
+            -o BatchMode=yes \
             -o ConnectTimeout=60 \
+            -o ServerAliveInterval=30 \
             -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" "$DEPLOY_SHA"
